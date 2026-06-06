@@ -17,12 +17,13 @@ import {
   ShieldCheck,
   Globe,
   LogOut,
-  LogIn
+  LogIn,
+  Trash2
 } from 'lucide-react';
 import { auth, googleProvider, db } from './firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, setDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, query, where, deleteDoc } from 'firebase/firestore';
 
 // --- Types ---
 type Format = 'league' | 'champions';
@@ -258,6 +259,23 @@ export default function App() {
   };
 
   const handleLogout = () => signOut(auth);
+
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation(); // Prevent clicking the card to load the session
+    if (!user) return;
+    
+    if (window.confirm('Are you sure you want to delete this session? It will be removed from your history and career stats.')) {
+      try {
+        // Delete from user's private collection
+        await deleteDoc(doc(db, 'users', user.uid, 'sessions', sessionId));
+        // Delete from public shared collection
+        await deleteDoc(doc(db, 'sessions', sessionId));
+      } catch (err) {
+        console.error("Error deleting session:", err);
+        alert("Failed to delete session.");
+      }
+    }
+  };
   
   useEffect(() => {
     if (rawSession) {
@@ -691,7 +709,14 @@ export default function App() {
                                   {new Date(s.createdAt).toLocaleDateString()} • {s.players.length} players
                                 </p>
                               </div>
-                              <ChevronLeft style={{ transform: 'rotate(180deg)', opacity: 0.3 }} size={20} />
+                              <button 
+                                className="btn btn-ghost" 
+                                onClick={(e) => handleDeleteSession(e, s.id)}
+                                style={{ padding: '0.5rem', color: '#ef4444', borderColor: 'transparent', background: 'transparent' }}
+                                title="Delete Session"
+                              >
+                                <Trash2 size={18} />
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -833,9 +858,24 @@ export default function App() {
                   </div>
                   <p className="meta-text">{sessionPayload.format === 'league' ? 'League' : 'Champions League Swiss'} • {sessionPayload.players.length} Players</p>
                 </div>
-                <button className="btn btn-ghost" onClick={() => { setSessionPayload(null); setMode('welcome'); }}>
-                  New Session
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {user && (mySessions.some(s => s.id === sessionPayload.id)) && (
+                    <button 
+                      className="btn btn-ghost" 
+                      onClick={async (e) => {
+                        await handleDeleteSession(e as any, sessionPayload.id);
+                        setSessionPayload(null);
+                        setMode('welcome');
+                      }}
+                      style={{ color: '#ef4444' }}
+                    >
+                      <Trash2 size={20} /> Delete
+                    </button>
+                  )}
+                  <button className="btn btn-ghost" onClick={() => { setSessionPayload(null); setMode('welcome'); }}>
+                    New Session
+                  </button>
+                </div>
               </div>
 
               <div className="grid-auto" style={{ marginBottom: '3rem' }}>
