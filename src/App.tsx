@@ -170,25 +170,71 @@ export default function App() {
 
   const [mySessions, setMySessions] = useState<SessionPayload[]>([]);
 
-  // Fetch user sessions from their private subcollection
+  const [careerStats, setCareerStats] = useState({ wins: 0, draws: 0, losses: 0, streak: [] as string[], totalGoals: 0 });
+
+  // Fetch user sessions and calculate career stats
   useEffect(() => {
     if (user) {
       const q = query(collection(db, 'users', user.uid, 'sessions'));
       const unsub = onSnapshot(q, (snapshot) => {
-        const sessions = snapshot.docs.map(doc => doc.data() as SessionPayload);
+        const sessions = snapshot.docs.map(doc => doc.data() as SessionPayload & { matchResults: Record<string, MatchResult> });
         setMySessions(sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+
+        // Calculate Career Stats
+        let w = 0, d = 0, l = 0, g = 0;
+        const allMatches: { date: string, result: string }[] = [];
+
+        sessions.forEach(s => {
+          if (!s.matchResults) return;
+          Object.entries(s.matchResults).forEach(([key, res]) => {
+            const [ctx, home, away] = key.split('|');
+            if (res.scoreA === '' || res.scoreB === '') return;
+            
+            const sA = Number(res.scoreA);
+            const sB = Number(res.scoreB);
+            
+            // Check if user (by their display name) was in this match
+            if (home === user.displayName) {
+              g += sA;
+              if (sA > sB) { w++; allMatches.push({ date: s.createdAt, result: 'W' }); }
+              else if (sA < sB) { l++; allMatches.push({ date: s.createdAt, result: 'L' }); }
+              else { d++; allMatches.push({ date: s.createdAt, result: 'D' }); }
+            } else if (away === user.displayName) {
+              g += sB;
+              if (sB > sA) { w++; allMatches.push({ date: s.createdAt, result: 'W' }); }
+              else if (sB < sA) { l++; allMatches.push({ date: s.createdAt, result: 'L' }); }
+              else { d++; allMatches.push({ date: s.createdAt, result: 'D' }); }
+            }
+          });
+        });
+
+        // Sort all matches by date to get streak
+        const streak = allMatches
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .map(m => m.result)
+          .slice(0, 5);
+
+        setCareerStats({ wins: w, draws: d, losses: l, streak, totalGoals: g });
       });
       return () => unsub();
     } else {
       setMySessions([]);
+      setCareerStats({ wins: 0, draws: 0, losses: 0, streak: [], totalGoals: 0 });
     }
   }, [user]);
 
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed', error);
+      if (error.code === 'auth/popup-blocked') {
+        alert('Please allow popups for this site to log in.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        alert('This domain is not authorized for Firebase Authentication. Please add it in the Firebase Console.');
+      } else {
+        alert(`Login failed: ${error.message}`);
+      }
     }
   };
 
@@ -528,22 +574,61 @@ export default function App() {
                       
                       <div style={{ 
                         display: 'grid', 
-                        gridTemplateColumns: '1fr 1fr', 
-                        gap: '1rem', 
+                        gridTemplateColumns: '1fr 1fr 1fr', 
+                        gap: '0.75rem', 
                         width: '100%',
-                        padding: '1.5rem',
-                        background: 'rgba(0,0,0,0.03)',
-                        borderRadius: '1.5rem'
+                        marginBottom: '1.5rem'
                       }}>
-                        <div>
-                          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Sessions</p>
-                          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent-blue)' }}>{mySessions.length}</p>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                          <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-emerald)', marginBottom: '0.25rem' }}>Wins</p>
+                          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>{careerStats.wins}</p>
                         </div>
-                        <div>
-                          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Total Players</p>
-                          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent-purple)' }}>
-                            {Array.from(new Set(mySessions.flatMap(s => s.players))).length}
-                          </p>
+                        <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+                          <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-blue)', marginBottom: '0.25rem' }}>Draws</p>
+                          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>{careerStats.draws}</p>
+                        </div>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                          <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: '#ef4444', marginBottom: '0.25rem' }}>Losses</p>
+                          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>{careerStats.losses}</p>
+                        </div>
+                      </div>
+
+                      <div style={{ 
+                        width: '100%', 
+                        padding: '1.25rem', 
+                        background: 'rgba(0,0,0,0.02)', 
+                        borderRadius: '1.5rem',
+                        textAlign: 'left'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Recent Form</span>
+                          <div style={{ display: 'flex', gap: '0.25rem' }}>
+                            {careerStats.streak.length > 0 ? careerStats.streak.map((r, i) => (
+                              <div key={i} style={{ 
+                                width: '24px', 
+                                height: '24px', 
+                                borderRadius: '6px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                fontSize: '0.75rem', 
+                                fontWeight: 900,
+                                background: r === 'W' ? 'var(--accent-emerald)' : r === 'D' ? 'var(--accent-blue)' : '#ef4444',
+                                color: 'white'
+                              }}>
+                                {r}
+                              </div>
+                            )) : <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No matches played</span>}
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Win Rate</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                            {careerStats.wins + careerStats.draws + careerStats.losses > 0 
+                              ? Math.round((careerStats.wins / (careerStats.wins + careerStats.draws + careerStats.losses)) * 100) 
+                              : 0}%
+                          </span>
                         </div>
                       </div>
                     </div>
