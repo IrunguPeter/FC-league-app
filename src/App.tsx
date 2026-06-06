@@ -947,8 +947,24 @@ export default function App() {
                   >
                     <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>{round.round}</h4>
                     {round.matches.map(([h, a]) => {
+                      const isBye = h === 'BYE' || a === 'BYE';
+                      const opponent = h === 'BYE' ? a : h;
                       const key = `${sessionPayload.format === 'league' ? '' : 'champions-league'}|${h}|${a}`;
                       const res = matchResults[key];
+
+                      if (isBye) {
+                        return (
+                          <div key={key} className="match-card" style={{ opacity: 0.7, borderStyle: 'dashed' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
+                              <span className="team-name">{opponent}</span>
+                              <div className="badge" style={{ margin: 0, background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)' }}>
+                                <Zap size={14} /> BYE / RESTING
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div key={key} className="match-card">
                           <div className="match-grid">
