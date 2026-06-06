@@ -15,8 +15,14 @@ import {
   Gamepad2,
   TrendingUp,
   ShieldCheck,
-  Globe
+  Globe,
+  LogOut,
+  LogIn
 } from 'lucide-react';
+import { auth, googleProvider, db } from './firebase';
+import { signInWithPopup, signOut } from 'firebase/auth';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { doc, setDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 
 // --- Types ---
 type Format = 'league' | 'champions';
@@ -150,6 +156,7 @@ const fadeInUp = {
 
 // --- Main Component ---
 export default function App() {
+  const [user, loading] = useAuthState(auth);
   const [mode, setMode] = useState<'welcome' | 'host' | 'join'>('welcome');
   const [title, setTitle] = useState('FC League Session');
   const [format, setFormat] = useState<Format>('league');
@@ -160,6 +167,32 @@ export default function App() {
   const [matchResults, setMatchResults] = useState<Record<string, MatchResult>>({});
 
   const rawSession = useQueryParameter('session');
+
+  const [mySessions, setMySessions] = useState<SessionPayload[]>([]);
+
+  // Fetch user sessions from their private subcollection
+  useEffect(() => {
+    if (user) {
+      const q = query(collection(db, 'users', user.uid, 'sessions'));
+      const unsub = onSnapshot(q, (snapshot) => {
+        const sessions = snapshot.docs.map(doc => doc.data() as SessionPayload);
+        setMySessions(sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      });
+      return () => unsub();
+    } else {
+      setMySessions([]);
+    }
+  }, [user]);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error('Login failed', error);
+    }
+  };
+
+  const handleLogout = () => signOut(auth);
   
   useEffect(() => {
     if (rawSession) {
@@ -167,6 +200,22 @@ export default function App() {
       if (payload) setSessionPayload(payload);
     }
   }, [rawSession]);
+
+  // Sync with Firestore if session has an ID and user is logged in
+  useEffect(() => {
+    if (sessionPayload?.id) {
+      const sessionRef = doc(db, 'sessions', sessionPayload.id);
+      const unsub = onSnapshot(sessionRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          if (data.matchResults) {
+            setMatchResults(data.matchResults);
+          }
+        }
+      });
+      return () => unsub();
+    }
+  }, [sessionPayload?.id]);
 
   const players = useMemo(() => normalizePlayers(playerText), [playerText]);
   const sessionUrl = useMemo(() => {
@@ -187,7 +236,7 @@ export default function App() {
       : generateChampionsStructure(sessionPayload.players);
   }, [sessionPayload]);
 
-  const handleHost = () => {
+  const handleHost = async () => {
     const payload: SessionPayload = {
       id: randomId(),
       title: title.trim() || 'FC League Session',
@@ -195,12 +244,45 @@ export default function App() {
       players,
       createdAt: new Date().toISOString(),
     };
+    
+    // Always attempt to save to Firestore if user is logged in
+    // This stores the 'master' record in their account
+    if (user) {
+      try {
+        await setDoc(doc(db, 'users', user.uid, 'sessions', payload.id), {
+          ...payload,
+          matchResults: {}
+        });
+        
+        // Also keep a shared version for friends to join/view
+        await setDoc(doc(db, 'sessions', payload.id), {
+          ...payload,
+          ownerId: user.uid,
+          matchResults: {}
+        });
+      } catch (e) {
+        console.error("Error saving session to account", e);
+      }
+    }
+    
     setSessionPayload(payload);
     setMode('host');
   };
 
-  const updateMatchResult = (key: string, field: 'scoreA' | 'scoreB', value: number | '') => {
-    setMatchResults(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  const updateMatchResult = async (key: string, field: 'scoreA' | 'scoreB', value: number | '') => {
+    const newResults = { ...matchResults, [key]: { ...matchResults[key], [field]: value } };
+    setMatchResults(newResults);
+
+    if (sessionPayload?.id && user) {
+      try {
+        // Update both the user's private copy and the shared session
+        const updates = { matchResults: newResults };
+        await setDoc(doc(db, 'users', user.uid, 'sessions', sessionPayload.id), updates, { merge: true });
+        await setDoc(doc(db, 'sessions', sessionPayload.id), updates, { merge: true });
+      } catch (e) {
+        console.error("Error updating scores", e);
+      }
+    }
   };
 
   const copyToClipboard = async (text: string) => {
@@ -228,9 +310,32 @@ export default function App() {
               <h1 style={{ fontSize: '1.5rem', margin: 0 }}>FC Companion</h1>
             </div>
           </div>
-          <button className="btn btn-ghost" onClick={() => { setSessionPayload(null); setMode('welcome'); }}>
-            <Gamepad2 size={20} />
-          </button>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {loading ? (
+              <div className="skeleton" style={{ width: '100px', height: '32px' }} />
+            ) : user ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <img 
+                  src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
+                  alt="Avatar" 
+                  style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+                />
+                <button className="btn btn-ghost" onClick={handleLogout} title="Logout">
+                  <LogOut size={20} />
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-ghost" onClick={handleLogin} title="Login with Google">
+                  <LogIn size={20} />
+                </button>
+              </div>
+            )}
+            <button className="btn btn-ghost" onClick={() => { setSessionPayload(null); setMode('welcome'); }}>
+              <Gamepad2 size={20} />
+            </button>
+          </div>
         </motion.header>
 
         <AnimatePresence mode="wait">
@@ -243,9 +348,116 @@ export default function App() {
               exit="hidden"
             >
               <section className="hero">
-                <motion.div variants={fadeInUp} className="badge">
-                  <TrendingUp size={14} /> NEW: Swiss Format Support
-                </motion.div>
+                <div className="hero-bg-image">
+                  <img 
+                    src="https://images.unsplash.com/photo-1587202372775-e229f172b9d7?q=80&w=2070&auto=format&fit=crop" 
+                    alt="Gaming PC" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+                {!user ? (
+                  <motion.div 
+                    variants={fadeInUp} 
+                    className="glass-panel" 
+                    style={{ 
+                      marginTop: '4rem', 
+                      padding: '4rem 2rem', 
+                      textAlign: 'center', 
+                      background: 'rgba(255, 255, 255, 0.6)',
+                      border: '1px solid rgba(255, 255, 255, 0.8)',
+                      borderRadius: '3rem',
+                      boxShadow: '0 32px 64px -12px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      marginBottom: '6rem'
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute',
+                      top: '-100px',
+                      right: '-100px',
+                      width: '300px',
+                      height: '300px',
+                      background: 'radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%)',
+                      zIndex: 0
+                    }} />
+                    
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                      <div style={{ 
+                        width: '80px', 
+                        height: '80px', 
+                        background: 'white', 
+                        borderRadius: '1.5rem', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        margin: '0 auto 2rem',
+                        boxShadow: '0 12px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.02)',
+                        transform: 'rotate(-4deg)'
+                      }}>
+                        <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" alt="Google" style={{ width: '40px' }} />
+                      </div>
+                      
+                      <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', fontWeight: 900, letterSpacing: '-0.04em', color: '#0f172a' }}>Your Stats, Everywhere.</h2>
+                      <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 2.5rem', fontSize: '1.2rem', lineHeight: 1.6 }}>
+                        Join thousands of players who track their FC dominance. Sign in with Google to sync your leagues and never lose a goal.
+                      </p>
+                      
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={handleLogin} 
+                        style={{ 
+                          background: '#0f172a', 
+                          color: 'white',
+                          padding: '1.25rem 3rem',
+                          fontSize: '1.125rem',
+                          borderRadius: '1.25rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '1rem',
+                          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                          border: 'none',
+                          fontWeight: 800
+                        }}
+                      >
+                        <LogIn size={24} /> Continue with Google
+                      </button>
+                      
+                      <div style={{ 
+                        marginTop: '3.5rem', 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        gap: '3rem',
+                        flexWrap: 'wrap'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Globe size={16} color="var(--accent-emerald)" />
+                          </div>
+                          Live Cloud Sync
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ShieldCheck size={16} color="var(--accent-blue)" />
+                          </div>
+                          Secure Profile
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trophy size={16} color="var(--accent-purple)" />
+                          </div>
+                          Global Rankings
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div variants={fadeInUp} style={{ margin: '2rem 0' }}>
+                    <div className="badge" style={{ padding: '0.75rem 1.5rem', borderRadius: '2rem', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--accent-emerald)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                      <CheckCircle2 size={18} /> Logged in as {user.displayName}
+                    </div>
+                  </motion.div>
+                )}
                 <motion.h1 variants={fadeInUp}>Level up your local game nights.</motion.h1>
                 <motion.p variants={fadeInUp}>
                   The professional companion for FC sessions. Manage leagues, track live standings, and share results with your squad instantly.
@@ -258,6 +470,135 @@ export default function App() {
                     <Users size={20} /> Join Friends
                   </button>
                 </motion.div>
+
+                {user && (
+                  <motion.div 
+                    variants={fadeInUp} 
+                    style={{ 
+                      marginTop: '3rem', 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+                      gap: '2rem',
+                      textAlign: 'left', 
+                      maxWidth: '1000px', 
+                      margin: '4rem auto 0' 
+                    }}
+                  >
+                    {/* Profile Card */}
+                    <div className="glass-panel" style={{ 
+                      padding: '2.5rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      textAlign: 'center',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      border: '1px solid white'
+                    }}>
+                      <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                        <img 
+                          src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
+                          alt="Profile" 
+                          style={{ 
+                            width: '100px', 
+                            height: '100px', 
+                            borderRadius: '2.5rem', 
+                            boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
+                            border: '4px solid white'
+                          }}
+                        />
+                        <div style={{ 
+                          position: 'absolute', 
+                          bottom: '-5px', 
+                          right: '-5px', 
+                          width: '32px', 
+                          height: '32px', 
+                          background: 'var(--accent-emerald)', 
+                          borderRadius: '50%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: '3px solid white',
+                          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                        }}>
+                          <CheckCircle2 size={16} color="white" />
+                        </div>
+                      </div>
+                      <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.75rem' }}>{user.displayName}</h2>
+                      <p className="meta-text" style={{ marginBottom: '2rem' }}>{user.email}</p>
+                      
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: '1fr 1fr', 
+                        gap: '1rem', 
+                        width: '100%',
+                        padding: '1.5rem',
+                        background: 'rgba(0,0,0,0.03)',
+                        borderRadius: '1.5rem'
+                      }}>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Sessions</p>
+                          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent-blue)' }}>{mySessions.length}</p>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Total Players</p>
+                          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent-purple)' }}>
+                            {Array.from(new Set(mySessions.flatMap(s => s.players))).length}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recent Sessions List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <Zap size={20} color="var(--accent-blue)" /> Recent Activity
+                      </h3>
+                      {mySessions.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {mySessions.slice(0, 3).map(s => (
+                            <div 
+                              key={s.id} 
+                              className="card-interactive" 
+                              style={{ 
+                                padding: '1.5rem', 
+                                display: 'flex', 
+                                flexDirection: 'row', 
+                                alignItems: 'center', 
+                                gap: '1.5rem',
+                                border: '1px solid rgba(0,0,0,0.05)',
+                                background: 'rgba(255,255,255,0.6)'
+                              }}
+                              onClick={() => setSessionPayload(s)}
+                            >
+                              <div style={{ 
+                                width: '48px', 
+                                height: '48px', 
+                                borderRadius: '1rem', 
+                                background: s.format === 'league' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                {s.format === 'league' ? <LayoutDashboard size={20} color="var(--accent-blue)" /> : <Trophy size={20} color="var(--accent-purple)" />}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem' }}>{s.title}</h4>
+                                <p className="meta-text" style={{ fontSize: '0.85rem' }}>
+                                  {new Date(s.createdAt).toLocaleDateString()} • {s.players.length} players
+                                </p>
+                              </div>
+                              <ChevronLeft style={{ transform: 'rotate(180deg)', opacity: 0.3 }} size={20} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No sessions yet. Host your first game to see it here!
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
 
                 <motion.div variants={fadeInUp} className="game-mockup">
                   <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop" alt="Gaming Setup" />
@@ -337,10 +678,32 @@ export default function App() {
                   </div>
                   <button 
                     className="btn btn-primary" 
-                    onClick={() => {
-                      const maybePayload = decodePayload(joinName.split('session=')[1] || joinName);
-                      if (maybePayload) setSessionPayload(maybePayload);
-                      else setJoinMessage('Invalid session code.');
+                    onClick={async () => {
+                      const id = joinName.split('session=')[1] ? decodePayload(joinName.split('session=')[1])?.id : joinName;
+                      if (!id) {
+                        setJoinMessage('Invalid session code.');
+                        return;
+                      }
+
+                      // Try to fetch from Firestore
+                      try {
+                        const { getDoc, doc } = await import('firebase/firestore');
+                        const sessionSnap = await getDoc(doc(db, 'sessions', id));
+                        if (sessionSnap.exists()) {
+                          const data = sessionSnap.data() as SessionPayload & { matchResults: Record<string, MatchResult> };
+                          setSessionPayload(data);
+                          if (data.matchResults) setMatchResults(data.matchResults);
+                        } else {
+                          // Fallback to decode payload if it was a URL
+                          const maybePayload = decodePayload(joinName.split('session=')[1] || joinName);
+                          if (maybePayload) setSessionPayload(maybePayload);
+                          else setJoinMessage('Session not found.');
+                        }
+                      } catch (e) {
+                        const maybePayload = decodePayload(joinName.split('session=')[1] || joinName);
+                        if (maybePayload) setSessionPayload(maybePayload);
+                        else setJoinMessage('Error loading session.');
+                      }
                     }}
                   >
                     <Zap size={20} /> Load Session

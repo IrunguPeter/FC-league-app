@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write only their own data in their private account area
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Shared sessions: 
+    // - Anyone with the session ID can READ (so friends can see live scores)
+    // - Only the owner (the person who created it) can WRITE/UPDATE
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        resource == null || resource.data.ownerId == request.auth.uid
+      );
+    }
+  }
+}

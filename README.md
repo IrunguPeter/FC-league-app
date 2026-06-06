@@ -1,29 +1,31 @@
 # FC League Companion
 
-A lightweight React app for hosting friendly FC sessions with league and Champions League-style formats.
+The ultimate companion for your FC game nights. Organize leagues, track live standings, and sync scores in real-time.
 
-## Features
+## 🎮 How to Use
 
-- Host a session with a shared link and QR code
-- Add players and choose League or Champions League-style organization
-- Generate round robin schedules or group/knockout structure
-- Join sessions by scanning QR code or opening a shared link
+### 1. Log In with Google
+Start by logging in with your Google account. This allows you to:
+- Save your game history forever.
+- Access your active sessions from any device.
+- Keep your personal player stats synced.
 
-## Setup
+### 2. Start a New Session
+Click **"Start Session"** on the home screen to set up your game night:
+- **Title:** Give your session a name (e.g., "Saturday Night Squad").
+- **Format:** Choose between a **Standard League** (Round Robin) or the **Champions League** (Swiss Format).
+- **Players:** Type in the names of everyone playing.
 
-1. Open a terminal in `fc-league-app`
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start development server:
-   ```bash
-   npm run dev
-   ```
+### 3. Invite Your Friends
+Once the session is created, sharing is easy:
+- **QR Code:** Have your friends scan the QR code on your screen with their phones.
+- **Link:** Copy the session link and send it to your group chat.
+- **Live Sync:** As soon as they join, they'll see the same live standings on their own devices.
 
-Open the local URL shown in the terminal and share the session with friends.
+### 4. Enter Scores
+As you play your matches, enter the scores directly into the fixtures list. 
+- **Real-time Standings:** The league table updates instantly after every goal.
+- **Automatic Rankings:** Points, Goal Difference, and Ranks are calculated for you.
 
-## Notes
-
-This initial version is a frontend app. It can be extended later with a backend or real-time sync service for live session updates across devices.
-# FC-league-app
+---
+*Happy Gaming! May the best player win.*
