@@ -170,58 +170,77 @@ export default function App() {
 
   const [mySessions, setMySessions] = useState<SessionPayload[]>([]);
 
-  const [careerStats, setCareerStats] = useState({ wins: 0, draws: 0, losses: 0, streak: [] as string[], totalGoals: 0 });
-
-  // Fetch user sessions and calculate career stats
+  // Fetch user sessions
   useEffect(() => {
-    if (user) {
-      const q = query(collection(db, 'users', user.uid, 'sessions'));
-      const unsub = onSnapshot(q, (snapshot) => {
-        const sessions = snapshot.docs.map(doc => doc.data() as SessionPayload & { matchResults: Record<string, MatchResult> });
-        setMySessions(sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-
-        // Calculate Career Stats
-        let w = 0, d = 0, l = 0, g = 0;
-        const allMatches: { date: string, result: string }[] = [];
-
-        sessions.forEach(s => {
-          if (!s.matchResults) return;
-          Object.entries(s.matchResults).forEach(([key, res]) => {
-            const [ctx, home, away] = key.split('|');
-            if (res.scoreA === '' || res.scoreB === '') return;
-            
-            const sA = Number(res.scoreA);
-            const sB = Number(res.scoreB);
-            
-            // Check if user (by their display name) was in this match
-            if (home === user.displayName) {
-              g += sA;
-              if (sA > sB) { w++; allMatches.push({ date: s.createdAt, result: 'W' }); }
-              else if (sA < sB) { l++; allMatches.push({ date: s.createdAt, result: 'L' }); }
-              else { d++; allMatches.push({ date: s.createdAt, result: 'D' }); }
-            } else if (away === user.displayName) {
-              g += sB;
-              if (sB > sA) { w++; allMatches.push({ date: s.createdAt, result: 'W' }); }
-              else if (sB < sA) { l++; allMatches.push({ date: s.createdAt, result: 'L' }); }
-              else { d++; allMatches.push({ date: s.createdAt, result: 'D' }); }
-            }
-          });
-        });
-
-        // Sort all matches by date to get streak
-        const streak = allMatches
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .map(m => m.result)
-          .slice(0, 5);
-
-        setCareerStats({ wins: w, draws: d, losses: l, streak, totalGoals: g });
-      });
-      return () => unsub();
-    } else {
+    if (!user) {
       setMySessions([]);
-      setCareerStats({ wins: 0, draws: 0, losses: 0, streak: [], totalGoals: 0 });
+      return;
     }
+    const q = query(collection(db, 'users', user.uid, 'sessions'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const sessions = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled Session',
+          format: data.format || 'league',
+          players: data.players || [],
+          createdAt: data.createdAt || new Date().toISOString(),
+          matchResults: data.matchResults || {}
+        } as SessionPayload & { matchResults: Record<string, MatchResult> };
+      });
+      setMySessions(sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    }, (err) => {
+      console.error("Firestore error:", err);
+    });
+    return () => unsub();
   }, [user]);
+
+  const careerStats = useMemo(() => {
+    let w = 0, d = 0, l = 0, g = 0;
+    const allMatches: { date: string, result: string }[] = [];
+    const currentDisplayName = user?.displayName || "";
+
+    if (!user || !mySessions.length) return { wins: 0, draws: 0, losses: 0, streak: [], totalGoals: 0 };
+
+    mySessions.forEach(s => {
+      const results = (s as any).matchResults;
+      if (!results || typeof results !== 'object') return;
+      
+      Object.entries(results).forEach(([key, res]: [string, any]) => {
+        if (!res || res.scoreA === '' || res.scoreB === '' || res.scoreA === undefined || res.scoreB === undefined) return;
+        
+        const parts = key.split('|');
+        if (parts.length < 2) return;
+        
+        const home = parts[parts.length - 2];
+        const away = parts[parts.length - 1];
+        
+        const sA = Number(res.scoreA);
+        const sB = Number(res.scoreB);
+        
+        if (isNaN(sA) || isNaN(sB)) return;
+
+        if (currentDisplayName && (home === currentDisplayName || away === currentDisplayName)) {
+          const isHome = home === currentDisplayName;
+          const userScore = isHome ? sA : sB;
+          const oppScore = isHome ? sB : sA;
+          
+          g += userScore;
+          if (userScore > oppScore) { w++; allMatches.push({ date: s.createdAt, result: 'W' }); }
+          else if (userScore < oppScore) { l++; allMatches.push({ date: s.createdAt, result: 'L' }); }
+          else { d++; allMatches.push({ date: s.createdAt, result: 'D' }); }
+        }
+      });
+    });
+
+    const streak = allMatches
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map(m => m.result)
+      .slice(0, 5);
+
+    return { wins: w, draws: d, losses: l, streak, totalGoals: g };
+  }, [user, mySessions]);
 
   const handleLogin = async () => {
     try {
