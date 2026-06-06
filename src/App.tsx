@@ -1,282 +1,63 @@
-import { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import QRCode from 'qrcode.react';
-import { 
-  Trophy, 
-  Users, 
-  Share2, 
-  Plus, 
-  ChevronLeft, 
-  QrCode, 
-  Copy, 
-  CheckCircle2, 
-  LayoutDashboard,
-  Zap,
-  Gamepad2,
-  TrendingUp,
-  ShieldCheck,
-  Globe,
-  LogOut,
-  LogIn,
-  Trash2
-} from 'lucide-react';
-import { auth, googleProvider, db } from './firebase';
+import { useState, useMemo, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { Moon, Sun } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, setDoc, onSnapshot, collection, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, googleProvider, db } from './firebase';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { Header } from './components/Header';
+import { WelcomePage } from './pages/WelcomePage';
+import { SetupPage } from './pages/SetupPage';
+import { SessionDashboard } from './pages/SessionDashboard';
+import { useQueryParameter } from './hooks/useQueryParameter';
+import { useSessions } from './hooks/useSessions';
+import { useCareerStats } from './hooks/useCareerStats';
+import { useSessionSync } from './hooks/useSessionSync';
+import {
+  normalizePlayers,
+  randomId,
+  encodePayload,
+  decodePayload,
+} from './utils/payload';
+import {
+  computeStandings,
+  generateLeagueRounds,
+  generateChampionsStructure,
+} from './utils/standings';
+import type { Format, SessionPayload, MatchResult } from './types';
 
-// --- Types ---
-type Format = 'league' | 'champions';
-
-type SessionPayload = {
-  id: string;
-  title: string;
-  format: Format;
-  players: string[];
-  createdAt: string;
-};
-
-type Round = { round: string; matches: [string, string][] };
-
-type StandingsEntry = {
-  player: string;
-  played: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  points: number;
-};
-
-type MatchResult = { scoreA: number | ''; scoreB: number | '' };
-
-// --- Constants ---
-const STORAGE_KEY = 'fc-league-app';
-
-// --- Utilities ---
-const encodePayload = (payload: SessionPayload): string => 
-  btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-
-const decodePayload = (value: string): SessionPayload | null => {
-  try {
-    const decoded = decodeURIComponent(escape(atob(value)));
-    return JSON.parse(decoded) as SessionPayload;
-  } catch { return null; }
-};
-
-const randomId = () => crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
-
-const normalizePlayers = (text: string): string[] => 
-  text.split(/[\n,]+/).map(n => n.trim()).filter(Boolean);
-
-function generateLeagueRounds(players: string[]): Round[] {
-  const roster = [...players];
-  if (roster.length % 2 !== 0) roster.push('BYE');
-  const rounds: Round[] = [];
-  const totalRounds = roster.length - 1;
-  const half = roster.length / 2;
-
-  for (let round = 0; round < totalRounds; round += 1) {
-    const matches: [string, string][] = [];
-    for (let i = 0; i < half; i += 1) {
-      matches.push([roster[i], roster[roster.length - 1 - i]]);
-    }
-    rounds.push({ round: `Round ${round + 1}`, matches });
-    const fixed = roster[0];
-    roster.splice(1, 0, roster.pop()!);
-    roster[0] = fixed;
-  }
-  return rounds;
-}
-
-function generateChampionsStructure(players: string[]): Round[] {
-  const roster = [...players];
-  if (roster.length % 2 !== 0) roster.push('BYE');
-  const rounds: Round[] = [];
-  const totalRounds = Math.min(8, roster.length - 1);
-  const half = roster.length / 2;
-
-  for (let round = 0; round < totalRounds; round += 1) {
-    const matches: [string, string][] = [];
-    for (let i = 0; i < half; i += 1) {
-      matches.push([roster[i], roster[roster.length - 1 - i]]);
-    }
-    rounds.push({ round: `Matchday ${round + 1}`, matches });
-    const fixed = roster[0];
-    roster.splice(1, 0, roster.pop()!);
-    roster[0] = fixed;
-  }
-  return rounds;
-}
-
-function computeStandings(players: string[], matchResults: Record<string, MatchResult>, context: string): StandingsEntry[] {
-  const standings: Record<string, StandingsEntry> = {};
-  players.forEach(p => standings[p] = { player: p, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 });
-
-  Object.entries(matchResults).forEach(([key, result]) => {
-    const [ctx, home, away] = key.split('|');
-    if (ctx !== context || result.scoreA === '' || result.scoreB === '') return;
-    const sA = Number(result.scoreA), sB = Number(result.scoreB);
-    if (standings[home]) {
-      standings[home].played++; standings[home].goalsFor += sA; standings[home].goalsAgainst += sB;
-      if (sA > sB) { standings[home].wins++; standings[home].points += 3; }
-      else if (sA < sB) standings[home].losses++;
-      else { standings[home].draws++; standings[home].points += 1; }
-    }
-    if (standings[away]) {
-      standings[away].played++; standings[away].goalsFor += sB; standings[away].goalsAgainst += sA;
-      if (sB > sA) { standings[away].wins++; standings[away].points += 3; }
-      else if (sB < sA) standings[away].losses++;
-      else { standings[away].draws++; standings[away].points += 1; }
-    }
-  });
-
-  return Object.values(standings).sort((a, b) => b.points !== a.points ? b.points - a.points : (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst));
-}
-
-function useQueryParameter(param: string): string | null {
-  const [val, setVal] = useState<string | null>(null);
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    setVal(searchParams.get(param));
-  }, [param]);
-  return val;
-}
-
-// --- Animation Variants ---
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-};
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
-};
-
-// --- Main Component ---
 export default function App() {
   const [user, loading] = useAuthState(auth);
   const [mode, setMode] = useState<'welcome' | 'host' | 'join'>('welcome');
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('fc-dark-mode');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  const toggleDarkMode = () => setDarkMode((prev) => !prev);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('fc-dark-mode', String(darkMode));
+  }, [darkMode]);
   const [title, setTitle] = useState('FC League Session');
   const [format, setFormat] = useState<Format>('league');
-  const [playerText, setPlayerText] = useState('Alice\nBob\nCharlie\nDiana');
-  const [sessionPayload, setSessionPayload] = useState<SessionPayload | null>(null);
+  const [playerText, setPlayerText] = useState(
+    'Alice\nBob\nCharlie\nDiana',
+  );
+  const [sessionPayload, setSessionPayload] =
+    useState<SessionPayload | null>(null);
   const [joinName, setJoinName] = useState('');
   const [joinMessage, setJoinMessage] = useState('');
-  const [matchResults, setMatchResults] = useState<Record<string, MatchResult>>({});
 
   const rawSession = useQueryParameter('session');
+  const { mySessions, handleDeleteSession } = useSessions(user);
+  const careerStats = useCareerStats(user, mySessions);
+  const { matchResults, setMatchResults, updateMatchResult } =
+    useSessionSync(sessionPayload?.id, user);
 
-  const [mySessions, setMySessions] = useState<SessionPayload[]>([]);
-
-  // Fetch user sessions
-  useEffect(() => {
-    if (!user) {
-      setMySessions([]);
-      return;
-    }
-    const q = query(collection(db, 'users', user.uid, 'sessions'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const sessions = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          title: data.title || 'Untitled Session',
-          format: data.format || 'league',
-          players: data.players || [],
-          createdAt: data.createdAt || new Date().toISOString(),
-          matchResults: data.matchResults || {}
-        } as SessionPayload & { matchResults: Record<string, MatchResult> };
-      });
-      setMySessions(sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    }, (err) => {
-      console.error("Firestore error:", err);
-    });
-    return () => unsub();
-  }, [user]);
-
-  const careerStats = useMemo(() => {
-    let w = 0, d = 0, l = 0, g = 0;
-    const allMatches: { date: string, result: string }[] = [];
-    const currentDisplayName = user?.displayName || "";
-
-    if (!user || !mySessions.length) return { wins: 0, draws: 0, losses: 0, streak: [], totalGoals: 0 };
-
-    mySessions.forEach(s => {
-      const results = (s as any).matchResults;
-      if (!results || typeof results !== 'object') return;
-      
-      Object.entries(results).forEach(([key, res]: [string, any]) => {
-        if (!res || res.scoreA === '' || res.scoreB === '' || res.scoreA === undefined || res.scoreB === undefined) return;
-        
-        const parts = key.split('|');
-        if (parts.length < 2) return;
-        
-        const home = parts[parts.length - 2];
-        const away = parts[parts.length - 1];
-        
-        const sA = Number(res.scoreA);
-        const sB = Number(res.scoreB);
-        
-        if (isNaN(sA) || isNaN(sB)) return;
-
-        if (currentDisplayName && (home === currentDisplayName || away === currentDisplayName)) {
-          const isHome = home === currentDisplayName;
-          const userScore = isHome ? sA : sB;
-          const oppScore = isHome ? sB : sA;
-          
-          g += userScore;
-          if (userScore > oppScore) { w++; allMatches.push({ date: s.createdAt, result: 'W' }); }
-          else if (userScore < oppScore) { l++; allMatches.push({ date: s.createdAt, result: 'L' }); }
-          else { d++; allMatches.push({ date: s.createdAt, result: 'D' }); }
-        }
-      });
-    });
-
-    const streak = allMatches
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .map(m => m.result)
-      .slice(0, 5);
-
-    return { wins: w, draws: d, losses: l, streak, totalGoals: g };
-  }, [user, mySessions]);
-
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error('Login failed', error);
-      if (error.code === 'auth/popup-blocked') {
-        alert('Please allow popups for this site to log in.');
-      } else if (error.code === 'auth/unauthorized-domain') {
-        alert('This domain is not authorized for Firebase Authentication. Please add it in the Firebase Console.');
-      } else {
-        alert(`Login failed: ${error.message}`);
-      }
-    }
-  };
-
-  const handleLogout = () => signOut(auth);
-
-  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation(); // Prevent clicking the card to load the session
-    if (!user) return;
-    
-    if (window.confirm('Are you sure you want to delete this session? It will be removed from your history and career stats.')) {
-      try {
-        // Delete from user's private collection
-        await deleteDoc(doc(db, 'users', user.uid, 'sessions', sessionId));
-        // Delete from public shared collection
-        await deleteDoc(doc(db, 'sessions', sessionId));
-      } catch (err) {
-        console.error("Error deleting session:", err);
-        alert("Failed to delete session.");
-      }
-    }
-  };
-  
   useEffect(() => {
     if (rawSession) {
       const payload = decodePayload(rawSession);
@@ -284,23 +65,11 @@ export default function App() {
     }
   }, [rawSession]);
 
-  // Sync with Firestore if session has an ID and user is logged in
-  useEffect(() => {
-    if (sessionPayload?.id) {
-      const sessionRef = doc(db, 'sessions', sessionPayload.id);
-      const unsub = onSnapshot(sessionRef, (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
-          if (data.matchResults) {
-            setMatchResults(data.matchResults);
-          }
-        }
-      });
-      return () => unsub();
-    }
-  }, [sessionPayload?.id]);
+  const players = useMemo(
+    () => normalizePlayers(playerText),
+    [playerText],
+  );
 
-  const players = useMemo(() => normalizePlayers(playerText), [playerText]);
   const sessionUrl = useMemo(() => {
     if (!sessionPayload) return '';
     const encoded = encodePayload(sessionPayload);
@@ -309,15 +78,39 @@ export default function App() {
 
   const standings = useMemo(() => {
     if (!sessionPayload) return [];
-    return computeStandings(sessionPayload.players, matchResults, sessionPayload.format === 'league' ? '' : 'champions-league');
+    return computeStandings(
+      sessionPayload.players,
+      matchResults,
+      sessionPayload.format === 'league' ? '' : 'champions-league',
+    );
   }, [sessionPayload, matchResults]);
 
   const rounds = useMemo(() => {
     if (!sessionPayload) return [];
-    return sessionPayload.format === 'league' 
-      ? generateLeagueRounds(sessionPayload.players) 
+    return sessionPayload.format === 'league'
+      ? generateLeagueRounds(sessionPayload.players)
       : generateChampionsStructure(sessionPayload.players);
   }, [sessionPayload]);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error('Login failed', error);
+      const err = error as { code?: string; message: string };
+      if (err.code === 'auth/popup-blocked') {
+        alert('Please allow popups for this site to log in.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        alert(
+          'This domain is not authorized for Firebase Authentication. Please add it in the Firebase Console.',
+        );
+      } else {
+        alert(`Login failed: ${err.message}`);
+      }
+    }
+  };
+
+  const handleLogout = () => signOut(auth);
 
   const handleHost = async () => {
     const payload: SessionPayload = {
@@ -327,675 +120,106 @@ export default function App() {
       players,
       createdAt: new Date().toISOString(),
     };
-    
-    // Always attempt to save to Firestore if user is logged in
-    // This stores the 'master' record in their account
+
     if (user) {
       try {
-        await setDoc(doc(db, 'users', user.uid, 'sessions', payload.id), {
-          ...payload,
-          matchResults: {}
-        });
-        
-        // Also keep a shared version for friends to join/view
+        await setDoc(
+          doc(db, 'users', user.uid, 'sessions', payload.id),
+          { ...payload, matchResults: {} },
+        );
         await setDoc(doc(db, 'sessions', payload.id), {
           ...payload,
           ownerId: user.uid,
-          matchResults: {}
+          matchResults: {},
         });
       } catch (e) {
-        console.error("Error saving session to account", e);
+        console.error('Error saving session to account', e);
       }
     }
-    
+
     setSessionPayload(payload);
     setMode('host');
   };
 
-  const updateMatchResult = async (key: string, field: 'scoreA' | 'scoreB', value: number | '') => {
-    const newResults = { ...matchResults, [key]: { ...matchResults[key], [field]: value } };
-    setMatchResults(newResults);
-
-    if (sessionPayload?.id && user) {
-      try {
-        // Update both the user's private copy and the shared session
-        const updates = { matchResults: newResults };
-        await setDoc(doc(db, 'users', user.uid, 'sessions', sessionPayload.id), updates, { merge: true });
-        await setDoc(doc(db, 'sessions', sessionPayload.id), updates, { merge: true });
-      } catch (e) {
-        console.error("Error updating scores", e);
-      }
-    }
+  const handleSessionLoaded = (
+    payload: SessionPayload,
+    results: Record<string, MatchResult>,
+  ) => {
+    setSessionPayload(payload);
+    setMatchResults(results);
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setJoinMessage('Link copied to clipboard!');
-      setTimeout(() => setJoinMessage(''), 3000);
-    } catch { setJoinMessage('Failed to copy link.'); }
+  const goHome = () => {
+    setSessionPayload(null);
+    setMode('welcome');
   };
 
   return (
-    <div className="bg-overlay-wrapper">
-      <div className="bg-overlay" />
-      <div className="bg-pattern" />
-      <div className="page-shell">
-        <motion.header 
-          className="glass-panel" 
-          style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div className="live-indicator" />
-            <div>
-              <h1 style={{ fontSize: '1.5rem', margin: 0 }}>FC Companion</h1>
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {loading ? (
-              <div className="skeleton" style={{ width: '100px', height: '32px' }} />
-            ) : user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <img 
-                  src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-                  alt="Avatar" 
-                  style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-                />
-                <button className="btn btn-ghost" onClick={handleLogout} title="Logout">
-                  <LogOut size={20} />
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-ghost" onClick={handleLogin} title="Login with Google">
-                  <LogIn size={20} />
-                </button>
-              </div>
+    <ErrorBoundary>
+      <div className="bg-overlay-wrapper">
+        <div className="bg-overlay" />
+        <div className="bg-pattern" />
+        <div className="page-shell">
+          <Header
+            loading={loading}
+            user={user}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
+            onHome={goHome}
+            darkMode={darkMode}
+            onToggleDarkMode={toggleDarkMode}
+          />
+
+          <AnimatePresence mode="wait">
+            {mode === 'welcome' && !sessionPayload && (
+              <WelcomePage
+                user={user}
+                onLogin={handleLogin}
+                onSetMode={setMode}
+                onSelectSession={setSessionPayload}
+                onDeleteSession={handleDeleteSession}
+                mySessions={mySessions}
+                careerStats={careerStats}
+              />
             )}
-            <button className="btn btn-ghost" onClick={() => { setSessionPayload(null); setMode('welcome'); }}>
-              <Gamepad2 size={20} />
-            </button>
-          </div>
-        </motion.header>
 
-        <AnimatePresence mode="wait">
-          {mode === 'welcome' && !sessionPayload && (
-            <motion.div 
-              key="landing"
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-            >
-              <section className="hero">
-                <div className="hero-bg-image">
-                  <img 
-                    src="https://images.unsplash.com/photo-1587202372775-e229f172b9d7?q=80&w=2070&auto=format&fit=crop" 
-                    alt="Gaming PC" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </div>
-                {!user ? (
-                  <motion.div 
-                    variants={fadeInUp} 
-                    className="glass-panel" 
-                    style={{ 
-                      marginTop: '4rem', 
-                      padding: '4rem 2rem', 
-                      textAlign: 'center', 
-                      background: 'rgba(255, 255, 255, 0.6)',
-                      border: '1px solid rgba(255, 255, 255, 0.8)',
-                      borderRadius: '3rem',
-                      boxShadow: '0 32px 64px -12px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5)',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      marginBottom: '6rem'
-                    }}
-                  >
-                    <div style={{
-                      position: 'absolute',
-                      top: '-100px',
-                      right: '-100px',
-                      width: '300px',
-                      height: '300px',
-                      background: 'radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%)',
-                      zIndex: 0
-                    }} />
-                    
-                    <div style={{ position: 'relative', zIndex: 1 }}>
-                      <div style={{ 
-                        width: '80px', 
-                        height: '80px', 
-                        background: 'white', 
-                        borderRadius: '1.5rem', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        margin: '0 auto 2rem',
-                        boxShadow: '0 12px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.02)',
-                        transform: 'rotate(-4deg)'
-                      }}>
-                        <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" alt="Google" style={{ width: '40px' }} />
-                      </div>
-                      
-                      <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', fontWeight: 900, letterSpacing: '-0.04em', color: '#0f172a' }}>Your Stats, Everywhere.</h2>
-                      <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 2.5rem', fontSize: '1.2rem', lineHeight: 1.6 }}>
-                        Join thousands of players who track their FC dominance. Sign in with Google to sync your leagues and never lose a goal.
-                      </p>
-                      
-                      <button 
-                        className="btn btn-primary" 
-                        onClick={handleLogin} 
-                        style={{ 
-                          background: '#0f172a', 
-                          color: 'white',
-                          padding: '1.25rem 3rem',
-                          fontSize: '1.125rem',
-                          borderRadius: '1.25rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '1rem',
-                          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
-                          border: 'none',
-                          fontWeight: 800
-                        }}
-                      >
-                        <LogIn size={24} /> Continue with Google
-                      </button>
-                      
-                      <div style={{ 
-                        marginTop: '3.5rem', 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        gap: '3rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Globe size={16} color="var(--accent-emerald)" />
-                          </div>
-                          Live Cloud Sync
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ShieldCheck size={16} color="var(--accent-blue)" />
-                          </div>
-                          Secure Profile
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Trophy size={16} color="var(--accent-purple)" />
-                          </div>
-                          Global Rankings
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div variants={fadeInUp} style={{ margin: '2rem 0' }}>
-                    <div className="badge" style={{ padding: '0.75rem 1.5rem', borderRadius: '2rem', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--accent-emerald)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                      <CheckCircle2 size={18} /> Logged in as {user.displayName}
-                    </div>
-                  </motion.div>
-                )}
-                <motion.h1 variants={fadeInUp}>Level up your local game nights.</motion.h1>
-                <motion.p variants={fadeInUp}>
-                  The professional companion for FC sessions. Manage leagues, track live standings, and share results with your squad instantly.
-                </motion.p>
-                <motion.div variants={fadeInUp} style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                  <button className="btn btn-primary" onClick={() => setMode('host')}>
-                    <Plus size={20} /> Start Session
-                  </button>
-                  <button className="btn btn-ghost" onClick={() => setMode('join')}>
-                    <Users size={20} /> Join Friends
-                  </button>
-                </motion.div>
+            {(mode === 'host' || mode === 'join') && !sessionPayload && (
+              <SetupPage
+                mode={mode}
+                onBack={() => setMode('welcome')}
+                title={title}
+                onTitleChange={setTitle}
+                format={format}
+                onFormatChange={setFormat}
+                playerText={playerText}
+                onPlayerTextChange={setPlayerText}
+                players={players}
+                onHost={handleHost}
+                joinName={joinName}
+                onJoinNameChange={setJoinName}
+                joinMessage={joinMessage}
+                onJoinMessageChange={setJoinMessage}
+                onSessionLoaded={handleSessionLoaded}
+              />
+            )}
 
-                {user && (
-                  <motion.div 
-                    variants={fadeInUp} 
-                    style={{ 
-                      marginTop: '3rem', 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-                      gap: '2rem',
-                      textAlign: 'left', 
-                      maxWidth: '1000px', 
-                      margin: '4rem auto 0' 
-                    }}
-                  >
-                    {/* Profile Card */}
-                    <div className="glass-panel" style={{ 
-                      padding: '2.5rem', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      textAlign: 'center',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      border: '1px solid white'
-                    }}>
-                      <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-                        <img 
-                          src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-                          alt="Profile" 
-                          style={{ 
-                            width: '100px', 
-                            height: '100px', 
-                            borderRadius: '2.5rem', 
-                            boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
-                            border: '4px solid white'
-                          }}
-                        />
-                        <div style={{ 
-                          position: 'absolute', 
-                          bottom: '-5px', 
-                          right: '-5px', 
-                          width: '32px', 
-                          height: '32px', 
-                          background: 'var(--accent-emerald)', 
-                          borderRadius: '50%', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          border: '3px solid white',
-                          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                        }}>
-                          <CheckCircle2 size={16} color="white" />
-                        </div>
-                      </div>
-                      <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.75rem' }}>{user.displayName}</h2>
-                      <p className="meta-text" style={{ marginBottom: '2rem' }}>{user.email}</p>
-                      
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: '1fr 1fr 1fr', 
-                        gap: '0.75rem', 
-                        width: '100%',
-                        marginBottom: '1.5rem'
-                      }}>
-                        <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                          <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-emerald)', marginBottom: '0.25rem' }}>Wins</p>
-                          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>{careerStats.wins}</p>
-                        </div>
-                        <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
-                          <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-blue)', marginBottom: '0.25rem' }}>Draws</p>
-                          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>{careerStats.draws}</p>
-                        </div>
-                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                          <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: '#ef4444', marginBottom: '0.25rem' }}>Losses</p>
-                          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>{careerStats.losses}</p>
-                        </div>
-                      </div>
-
-                      <div style={{ 
-                        width: '100%', 
-                        padding: '1.25rem', 
-                        background: 'rgba(0,0,0,0.02)', 
-                        borderRadius: '1.5rem',
-                        textAlign: 'left'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Recent Form</span>
-                          <div style={{ display: 'flex', gap: '0.25rem' }}>
-                            {careerStats.streak.length > 0 ? careerStats.streak.map((r, i) => (
-                              <div key={i} style={{ 
-                                width: '24px', 
-                                height: '24px', 
-                                borderRadius: '6px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                fontSize: '0.75rem', 
-                                fontWeight: 900,
-                                background: r === 'W' ? 'var(--accent-emerald)' : r === 'D' ? 'var(--accent-blue)' : '#ef4444',
-                                color: 'white'
-                              }}>
-                                {r}
-                              </div>
-                            )) : <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No matches played</span>}
-                          </div>
-                        </div>
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Win Rate</span>
-                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
-                            {careerStats.wins + careerStats.draws + careerStats.losses > 0 
-                              ? Math.round((careerStats.wins / (careerStats.wins + careerStats.draws + careerStats.losses)) * 100) 
-                              : 0}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Recent Sessions List */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <Zap size={20} color="var(--accent-blue)" /> Recent Activity
-                      </h3>
-                      {mySessions.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          {mySessions.slice(0, 3).map(s => (
-                            <div 
-                              key={s.id} 
-                              className="card-interactive" 
-                              style={{ 
-                                padding: '1.5rem', 
-                                display: 'flex', 
-                                flexDirection: 'row', 
-                                alignItems: 'center', 
-                                gap: '1.5rem',
-                                border: '1px solid rgba(0,0,0,0.05)',
-                                background: 'rgba(255,255,255,0.6)'
-                              }}
-                              onClick={() => setSessionPayload(s)}
-                            >
-                              <div style={{ 
-                                width: '48px', 
-                                height: '48px', 
-                                borderRadius: '1rem', 
-                                background: s.format === 'league' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}>
-                                {s.format === 'league' ? <LayoutDashboard size={20} color="var(--accent-blue)" /> : <Trophy size={20} color="var(--accent-purple)" />}
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <h4 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem' }}>{s.title}</h4>
-                                <p className="meta-text" style={{ fontSize: '0.85rem' }}>
-                                  {new Date(s.createdAt).toLocaleDateString()} • {s.players.length} players
-                                </p>
-                              </div>
-                              <button 
-                                className="btn btn-ghost" 
-                                onClick={(e) => handleDeleteSession(e, s.id)}
-                                style={{ padding: '0.5rem', color: '#ef4444', borderColor: 'transparent', background: 'transparent' }}
-                                title="Delete Session"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                          No sessions yet. Host your first game to see it here!
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                <motion.div variants={fadeInUp} className="game-mockup">
-                  <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop" alt="Gaming Setup" />
-                  <div className="floating-stats">
-                    <div className="stat-pill">
-                      <ShieldCheck size={18} color="var(--accent-emerald)" /> 
-                      Rank #1: Pro Gamer
-                    </div>
-                    <div className="stat-pill">
-                      <Globe size={18} color="var(--accent-blue)" /> 
-                      Live Sync Enabled
-                    </div>
-                  </div>
-                </motion.div>
-              </section>
-
-              <div className="grid-auto" style={{ marginTop: '4rem' }}>
-                <motion.div variants={fadeInUp} className="card-interactive">
-                  <Trophy size={48} color="var(--accent-emerald)" />
-                  <h2>Automated Standings</h2>
-                  <p>Points, GD, and ranks update in real-time as you enter scores.</p>
-                </motion.div>
-                <motion.div variants={fadeInUp} className="card-interactive">
-                  <Share2 size={48} color="var(--accent-blue)" />
-                  <h2>Instant Sharing</h2>
-                  <p>QR codes and deep links let everyone track the league from their own phone.</p>
-                </motion.div>
-                <motion.div variants={fadeInUp} className="card-interactive">
-                  <LayoutDashboard size={48} color="#9333ea" />
-                  <h2>Pro Formats</h2>
-                  <p>Choose between standard Round Robin or the new Champions League Swiss format.</p>
-                </motion.div>
-              </div>
-            </motion.div>
-          )}
-
-          {(mode === 'host' || mode === 'join') && !sessionPayload && (
-            <motion.div 
-              key="setup"
-              className="glass-panel"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-            >
-              <button className="btn btn-ghost" onClick={() => setMode('welcome')} style={{ marginBottom: '2rem' }}>
-                <ChevronLeft size={20} /> Back
-              </button>
-              
-              {mode === 'host' ? (
-                <>
-                  <h2>Session Setup</h2>
-                  <div className="form-group">
-                    <label>Session Title</label>
-                    <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Champions Night" />
-                  </div>
-                  <div className="form-group">
-                    <label>Format</label>
-                    <select value={format} onChange={e => setFormat(e.target.value as Format)}>
-                      <option value="league">Standard League</option>
-                      <option value="champions">Champions League (Swiss)</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Players (one per line)</label>
-                    <textarea rows={5} value={playerText} onChange={e => setPlayerText(e.target.value)} />
-                  </div>
-                  <button className="btn btn-primary" onClick={handleHost} disabled={players.length < 2}>
-                    <Plus size={20} /> Create Session
-                  </button>
-                </>
-              ) : (
-                <>
-                  <h2>Join Session</h2>
-                  <div className="form-group">
-                    <label>Session Link or Code</label>
-                    <input value={joinName} onChange={e => setJoinName(e.target.value)} placeholder="Paste URL or ID" />
-                  </div>
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={async () => {
-                      const id = joinName.split('session=')[1] ? decodePayload(joinName.split('session=')[1])?.id : joinName;
-                      if (!id) {
-                        setJoinMessage('Invalid session code.');
-                        return;
-                      }
-
-                      // Try to fetch from Firestore
-                      try {
-                        const { getDoc, doc } = await import('firebase/firestore');
-                        const sessionSnap = await getDoc(doc(db, 'sessions', id));
-                        if (sessionSnap.exists()) {
-                          const data = sessionSnap.data() as SessionPayload & { matchResults: Record<string, MatchResult> };
-                          setSessionPayload(data);
-                          if (data.matchResults) setMatchResults(data.matchResults);
-                        } else {
-                          // Fallback to decode payload if it was a URL
-                          const maybePayload = decodePayload(joinName.split('session=')[1] || joinName);
-                          if (maybePayload) setSessionPayload(maybePayload);
-                          else setJoinMessage('Session not found.');
-                        }
-                      } catch (e) {
-                        const maybePayload = decodePayload(joinName.split('session=')[1] || joinName);
-                        if (maybePayload) setSessionPayload(maybePayload);
-                        else setJoinMessage('Error loading session.');
-                      }
-                    }}
-                  >
-                    <Zap size={20} /> Load Session
-                  </button>
-                  {joinMessage && <p style={{ marginTop: '1rem', color: '#ef4444' }}>{joinMessage}</p>}
-                </>
-              )}
-            </motion.div>
-          )}
-
-          {sessionPayload && (
-            <motion.div 
-              key="dashboard"
-              className="glass-panel"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <LayoutDashboard size={24} color="var(--accent-blue)" />
-                    <h2 style={{ margin: 0 }}>{sessionPayload.title}</h2>
-                  </div>
-                  <p className="meta-text">{sessionPayload.format === 'league' ? 'League' : 'Champions League Swiss'} • {sessionPayload.players.length} Players</p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  {user && (mySessions.some(s => s.id === sessionPayload.id)) && (
-                    <button 
-                      className="btn btn-ghost" 
-                      onClick={async (e) => {
-                        await handleDeleteSession(e as any, sessionPayload.id);
-                        setSessionPayload(null);
-                        setMode('welcome');
-                      }}
-                      style={{ color: '#ef4444' }}
-                    >
-                      <Trash2 size={20} /> Delete
-                    </button>
-                  )}
-                  <button className="btn btn-ghost" onClick={() => { setSessionPayload(null); setMode('welcome'); }}>
-                    New Session
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid-auto" style={{ marginBottom: '3rem' }}>
-                <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                  <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Trophy size={20} color="var(--accent-emerald)" /> Standings
-                  </h3>
-                  <div className="standings-container">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Player</th>
-                          <th>P</th>
-                          <th>GD</th>
-                          <th>Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <AnimatePresence>
-                          {standings.map((entry, idx) => (
-                            <motion.tr 
-                              key={entry.player}
-                              layout
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className={
-                                sessionPayload.format === 'champions' 
-                                  ? (idx < 8 ? 'row-highlight-success' : idx < 24 ? 'row-highlight-warning' : 'row-highlight-danger')
-                                  : ''
-                              }
-                            >
-                              <td><strong>{entry.player}</strong></td>
-                              <td>{entry.played}</td>
-                              <td>{entry.goalsFor - entry.goalsAgainst}</td>
-                              <td style={{ color: 'var(--accent-blue)', fontWeight: 800 }}>{entry.points}</td>
-                            </motion.tr>
-                          ))}
-                        </AnimatePresence>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                  <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                    <Share2 size={20} color="var(--accent-blue)" /> Share
-                  </h3>
-                  <div style={{ background: 'white', padding: '1rem', borderRadius: '1rem', display: 'inline-block', marginBottom: '1.5rem' }}>
-                    <QRCode value={sessionUrl} size={160} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input readOnly value={sessionUrl} style={{ fontSize: '0.8rem' }} />
-                    <button className="btn btn-primary" onClick={() => copyToClipboard(sessionUrl)} style={{ padding: '0 1rem' }}>
-                      <Copy size={18} />
-                    </button>
-                  </div>
-                  {joinMessage && <p style={{ marginTop: '0.5rem', color: 'var(--accent-emerald)', fontSize: '0.9rem' }}>{joinMessage}</p>}
-                </div>
-              </div>
-
-              <h3 style={{ marginBottom: '1.5rem' }}>Fixtures</h3>
-              <div className="grid-auto">
-                {rounds.map((round, rIdx) => (
-                  <motion.div 
-                    key={round.round}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: rIdx * 0.1 }}
-                  >
-                    <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>{round.round}</h4>
-                    {round.matches.map(([h, a]) => {
-                      const isBye = h === 'BYE' || a === 'BYE';
-                      const opponent = h === 'BYE' ? a : h;
-                      const key = `${sessionPayload.format === 'league' ? '' : 'champions-league'}|${h}|${a}`;
-                      const res = matchResults[key];
-
-                      if (isBye) {
-                        return (
-                          <div key={key} className="match-card" style={{ opacity: 0.7, borderStyle: 'dashed' }}>
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
-                              <span className="team-name">{opponent}</span>
-                              <div className="badge" style={{ margin: 0, background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)' }}>
-                                <Zap size={14} /> BYE / RESTING
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={key} className="match-card">
-                          <div className="match-grid">
-                            <span className="team-name">{h}</span>
-                            <div className="score-display">
-                              <input 
-                                className="score-input"
-                                type="number" 
-                                value={res?.scoreA ?? ''} 
-                                onChange={e => updateMatchResult(key, 'scoreA', e.target.value === '' ? '' : Number(e.target.value))}
-                              />
-                              <span style={{ fontWeight: 800, color: 'var(--text-secondary)' }}>:</span>
-                              <input 
-                                className="score-input"
-                                type="number" 
-                                value={res?.scoreB ?? ''} 
-                                onChange={e => updateMatchResult(key, 'scoreB', e.target.value === '' ? '' : Number(e.target.value))}
-                              />
-                            </div>
-                            <span className="team-name">{a}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {sessionPayload && (
+              <SessionDashboard
+                sessionPayload={sessionPayload}
+                user={user}
+                mySessions={mySessions}
+                matchResults={matchResults}
+                standings={standings}
+                rounds={rounds}
+                sessionUrl={sessionUrl}
+                onUpdateMatch={updateMatchResult}
+                onDeleteSession={handleDeleteSession}
+                onBackToHome={goHome}
+              />
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
