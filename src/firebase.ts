@@ -15,9 +15,7 @@ const envSchema = z.object({
 const env = envSchema.safeParse(import.meta.env);
 
 if (!env.success) {
-  const missing = env.error.issues
-    .map((i) => i.path.join('.'))
-    .join(', ');
+  const missing = env.error.issues.map((i) => i.path.join('.')).join(', ');
   throw new Error(
     `Missing or invalid Firebase environment variables: ${missing}. Check your .env file.`,
   );

@@ -6,7 +6,11 @@ type Props = {
   away: string;
   matchKey: string;
   result?: MatchResult;
-  onUpdate: (key: string, field: 'scoreA' | 'scoreB', value: number | '') => void;
+  onUpdate: (
+    key: string,
+    field: 'scoreA' | 'scoreB',
+    value: number | '',
+  ) => void;
 };
 
 export function MatchCard({ home, away, matchKey, result, onUpdate }: Props) {
@@ -18,27 +22,31 @@ export function MatchCard({ home, away, matchKey, result, onUpdate }: Props) {
       <div
         key={matchKey}
         className="match-card"
-        style={{ opacity: 0.7, borderStyle: 'dashed' }}
+        style={{ opacity: 0.6, borderStyle: 'dashed' }}
       >
         <div
           style={{
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: '1rem',
+            gap: '0.75rem',
           }}
         >
-          <span className="team-name">{opponent}</span>
+          <span className="team-name" style={{ color: 'var(--text-muted)' }}>
+            {opponent}
+          </span>
           <div
             className="badge"
             style={{
               margin: 0,
-              background: 'rgba(0,0,0,0.05)',
+              background: 'var(--bg-secondary)',
               color: 'var(--text-muted)',
-              border: '1px dashed var(--border-subtle)',
+              border: '1px dashed var(--border-strong)',
+              fontSize: '0.8rem',
+              padding: '0.35rem 0.85rem',
             }}
           >
-            <Zap size={14} /> BYE / RESTING
+            <Zap size={12} /> BYE
           </div>
         </div>
       </div>
@@ -62,9 +70,7 @@ export function MatchCard({ home, away, matchKey, result, onUpdate }: Props) {
               )
             }
           />
-          <span style={{ fontWeight: 800, color: 'var(--text-secondary)' }}>
-            :
-          </span>
+          <span className="score-separator">:</span>
           <input
             className="score-input"
             type="number"

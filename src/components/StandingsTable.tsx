@@ -9,16 +9,9 @@ type Props = {
 
 export function StandingsTable({ standings, format }: Props) {
   return (
-    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-      <h3
-        style={{
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-        }}
-      >
-        <Trophy size={20} color="var(--accent-emerald)" /> Standings
+    <div className="standings-panel">
+      <h3 className="standings-title">
+        <Trophy size={18} color="var(--accent-emerald)" /> Standings
       </h3>
       <div className="standings-container">
         <table>
@@ -52,17 +45,36 @@ export function StandingsTable({ standings, format }: Props) {
                       : ''
                   }
                 >
-                  <td style={{ fontWeight: 800, color: 'var(--text-muted)' }}>
+                  <td
+                    style={{
+                      fontWeight: 700,
+                      color: 'var(--text-muted)',
+                      fontSize: '0.85rem',
+                    }}
+                  >
                     {idx + 1}
                   </td>
                   <td>
-                    <strong>{entry.player}</strong>
+                    <strong style={{ fontWeight: 700 }}>{entry.player}</strong>
                   </td>
-                  <td>{entry.played}</td>
-                  <td>{entry.wins}</td>
-                  <td>{entry.draws}</td>
-                  <td>{entry.losses}</td>
-                  <td>{entry.goalsFor - entry.goalsAgainst}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {entry.played}
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {entry.wins}
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {entry.draws}
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {entry.losses}
+                  </td>
+                  <td
+                    style={{ color: 'var(--text-secondary)', fontWeight: 600 }}
+                  >
+                    {entry.goalsFor - entry.goalsAgainst > 0 && '+'}
+                    {entry.goalsFor - entry.goalsAgainst}
+                  </td>
                   <td style={{ color: 'var(--accent-blue)', fontWeight: 800 }}>
                     {entry.points}
                   </td>

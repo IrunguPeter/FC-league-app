@@ -12,63 +12,78 @@ type Props = {
   onToggleDarkMode: () => void;
 };
 
-export function Header({ loading, user, onLogin, onLogout, onHome, darkMode, onToggleDarkMode }: Props) {
+export function Header({
+  loading,
+  user,
+  onLogin,
+  onLogout,
+  onHome,
+  darkMode,
+  onToggleDarkMode,
+}: Props) {
   return (
     <motion.header
-      className="glass-panel"
-      style={{
-        marginBottom: '2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}
-      initial={{ opacity: 0, y: -20 }}
+      className="header"
+      initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div
+        className="header-brand"
+        onClick={onHome}
+        style={{ cursor: 'pointer' }}
+      >
         <div className="live-indicator" />
-        <div>
-          <h1 style={{ fontSize: '1.5rem', margin: 0 }}>FC Companion</h1>
-        </div>
+        <span className="header-brand-text">FC Companion</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="header-actions">
         <button
-          className="btn btn-ghost"
+          className="btn btn-ghost btn-icon"
           onClick={onToggleDarkMode}
           title="Toggle theme"
         >
-          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+          {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         {loading ? (
-          <div className="skeleton" style={{ width: '100px', height: '32px' }} />
+          <div
+            className="skeleton"
+            style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+          />
         ) : user ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <>
             <img
               src={
                 user.photoURL ||
                 `https://ui-avatars.com/api/?name=${user.displayName}`
               }
               alt="Avatar"
-              style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+              className="header-avatar"
             />
-            <button className="btn btn-ghost" onClick={onLogout} title="Logout">
-              <LogOut size={20} />
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
-              className="btn btn-ghost"
-              onClick={onLogin}
-              title="Login with Google"
+              className="btn btn-ghost btn-icon"
+              onClick={onLogout}
+              title="Logout"
             >
-              <LogIn size={20} />
+              <LogOut size={18} />
             </button>
-          </div>
+          </>
+        ) : (
+          <button
+            className="btn btn-ghost"
+            onClick={onLogin}
+            title="Login with Google"
+          >
+            <LogIn size={18} />{' '}
+            <span style={{ fontSize: '0.85rem' }}>Sign In</span>
+          </button>
         )}
-        <button className="btn btn-ghost" onClick={onHome}>
-          <Gamepad2 size={20} />
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={onHome}
+          title="Home"
+        >
+          <Gamepad2 size={18} />
         </button>
       </div>
     </motion.header>

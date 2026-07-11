@@ -8,7 +8,6 @@ import type { Format, SessionPayload, MatchResult } from '../types';
 type Props = {
   mode: 'host' | 'join';
   onBack: () => void;
-  // Host state
   title: string;
   onTitleChange: (v: string) => void;
   format: Format;
@@ -17,7 +16,6 @@ type Props = {
   onPlayerTextChange: (v: string) => void;
   players: string[];
   onHost: () => void;
-  // Join state
   joinName: string;
   onJoinNameChange: (v: string) => void;
   joinMessage: string;
@@ -80,22 +78,23 @@ export function SetupPage({
   return (
     <motion.div
       key="setup"
-      className="glass-panel"
-      initial={{ opacity: 0, scale: 0.95 }}
+      className="glass-panel setup-container"
+      initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.25 }}
     >
       <button
         className="btn btn-ghost"
         onClick={onBack}
-        style={{ marginBottom: '2rem' }}
+        style={{ marginBottom: '1.5rem' }}
       >
-        <ChevronLeft size={20} /> Back
+        <ChevronLeft size={18} /> Back
       </button>
 
       {mode === 'host' ? (
         <>
-          <h2>Session Setup</h2>
+          <h2 style={{ marginBottom: '1.5rem' }}>Session Setup</h2>
           <div className="form-group">
             <label>Session Title</label>
             <input
@@ -120,19 +119,21 @@ export function SetupPage({
               rows={5}
               value={playerText}
               onChange={(e) => onPlayerTextChange(e.target.value)}
+              placeholder="Enter player names..."
             />
           </div>
           <button
             className="btn btn-primary"
             onClick={onHost}
             disabled={players.length < 2}
+            style={{ width: '100%' }}
           >
             <Plus size={20} /> Create Session
           </button>
         </>
       ) : (
         <>
-          <h2>Join Session</h2>
+          <h2 style={{ marginBottom: '1.5rem' }}>Join Session</h2>
           <div className="form-group">
             <label>Session Link or Code</label>
             <input
@@ -141,14 +142,14 @@ export function SetupPage({
               placeholder="Paste URL or ID"
             />
           </div>
-          <button className="btn btn-primary" onClick={handleJoin}>
+          <button
+            className="btn btn-primary"
+            onClick={handleJoin}
+            style={{ width: '100%' }}
+          >
             <Zap size={20} /> Load Session
           </button>
-          {joinMessage && (
-            <p style={{ marginTop: '1rem', color: '#ef4444' }}>
-              {joinMessage}
-            </p>
-          )}
+          {joinMessage && <p className="error-message">{joinMessage}</p>}
         </>
       )}
     </motion.div>

@@ -4,7 +4,9 @@ import type { SessionPayload, MatchResult, CareerStats } from '../types';
 
 export function useCareerStats(
   user: User | null | undefined,
-  mySessions: (SessionPayload & { matchResults: Record<string, MatchResult> })[],
+  mySessions: (SessionPayload & {
+    matchResults: Record<string, MatchResult>;
+  })[],
 ): CareerStats {
   return useMemo(() => {
     let w = 0,

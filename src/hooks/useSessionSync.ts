@@ -4,8 +4,13 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { MatchResult } from '../types';
 
-export function useSessionSync(sessionId: string | undefined, user: User | null | undefined) {
-  const [matchResults, setMatchResults] = useState<Record<string, MatchResult>>({});
+export function useSessionSync(
+  sessionId: string | undefined,
+  user: User | null | undefined,
+) {
+  const [matchResults, setMatchResults] = useState<Record<string, MatchResult>>(
+    {},
+  );
 
   useEffect(() => {
     if (!sessionId) return;

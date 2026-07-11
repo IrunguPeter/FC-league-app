@@ -22,9 +22,14 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="page-shell">
-          <div className="glass-panel" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <div
+            className="glass-panel"
+            style={{ textAlign: 'center', padding: '4rem 2rem' }}
+          >
             <h2>Something went wrong</h2>
-            <p style={{ color: 'var(--text-secondary)', margin: '1rem 0 2rem' }}>
+            <p
+              style={{ color: 'var(--text-secondary)', margin: '1rem 0 2rem' }}
+            >
               {this.state.error?.message || 'An unexpected error occurred.'}
             </p>
             <button

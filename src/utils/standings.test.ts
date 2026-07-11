@@ -108,11 +108,7 @@ describe('computeStandings', () => {
       'champions-league|Charlie|Bob': { scoreA: 2, scoreB: 2 },
     };
     const leagueStandings = computeStandings(players, results, '');
-    const clStandings = computeStandings(
-      players,
-      results,
-      'champions-league',
-    );
+    const clStandings = computeStandings(players, results, 'champions-league');
 
     // League context should only include the first match
     const leagueAlice = leagueStandings.find((s) => s.player === 'Alice');

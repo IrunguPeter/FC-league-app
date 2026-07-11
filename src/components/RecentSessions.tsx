@@ -9,86 +9,80 @@ type Props = {
 
 export function RecentSessions({ sessions, onSelect, onDelete }: Props) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <h3
         style={{
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem',
+          gap: '0.65rem',
         }}
       >
-        <Zap size={20} color="var(--accent-blue)" /> Recent Activity
+        <Zap size={18} color="var(--accent-blue)" /> Recent Activity
       </h3>
       {sessions.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="recent-sessions-container">
           {sessions.slice(0, 3).map((s) => (
             <div
               key={s.id}
               className="card-interactive"
               style={{
-                padding: '1.5rem',
-                display: 'flex',
+                padding: '1.25rem',
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: '1.5rem',
+                gap: '1rem',
               }}
               onClick={() => onSelect(s)}
             >
               <div
                 style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '1rem',
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '0.85rem',
                   background:
                     s.format === 'league'
-                      ? 'rgba(59, 130, 246, 0.1)'
-                      : 'rgba(139, 92, 246, 0.1)',
+                      ? 'var(--accent-blue-light)'
+                      : 'var(--accent-purple-light)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  flexShrink: 0,
                 }}
               >
                 {s.format === 'league' ? (
-                  <LayoutDashboard size={20} color="var(--accent-blue)" />
+                  <LayoutDashboard size={18} color="var(--accent-blue)" />
                 ) : (
-                  <Trophy size={20} color="var(--accent-purple)" />
+                  <Trophy size={18} color="var(--accent-purple)" />
                 )}
               </div>
-              <div style={{ flex: 1 }}>
-                <h4 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ margin: '0 0 0.2rem', fontSize: '1rem' }}>
                   {s.title}
                 </h4>
-                <p className="meta-text" style={{ fontSize: '0.85rem' }}>
-                  {new Date(s.createdAt).toLocaleDateString()} •{' '}
+                <p
+                  className="meta-text"
+                  style={{ fontSize: '0.8rem', margin: 0 }}
+                >
+                  {new Date(s.createdAt).toLocaleDateString()} &middot;{' '}
                   {s.players.length} players
                 </p>
               </div>
               <button
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-icon"
                 onClick={(e) => onDelete(e, s.id)}
                 style={{
-                  padding: '0.5rem',
-                  color: '#ef4444',
-                  borderColor: 'transparent',
-                  background: 'transparent',
+                  color: 'var(--accent-red)',
+                  flexShrink: 0,
                 }}
                 title="Delete Session"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
               </button>
             </div>
           ))}
         </div>
       ) : (
-        <div
-          className="glass-panel"
-          style={{
-            padding: '2rem',
-            textAlign: 'center',
-            color: 'var(--text-muted)',
-          }}
-        >
+        <div className="empty-state">
           No sessions yet. Host your first game to see it here!
         </div>
       )}

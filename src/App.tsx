@@ -44,19 +44,20 @@ export default function App() {
   }, [darkMode]);
   const [title, setTitle] = useState('FC League Session');
   const [format, setFormat] = useState<Format>('league');
-  const [playerText, setPlayerText] = useState(
-    'Alice\nBob\nCharlie\nDiana',
+  const [playerText, setPlayerText] = useState('Alice\nBob\nCharlie\nDiana');
+  const [sessionPayload, setSessionPayload] = useState<SessionPayload | null>(
+    null,
   );
-  const [sessionPayload, setSessionPayload] =
-    useState<SessionPayload | null>(null);
   const [joinName, setJoinName] = useState('');
   const [joinMessage, setJoinMessage] = useState('');
 
   const rawSession = useQueryParameter('session');
   const { mySessions, handleDeleteSession } = useSessions(user);
   const careerStats = useCareerStats(user, mySessions);
-  const { matchResults, setMatchResults, updateMatchResult } =
-    useSessionSync(sessionPayload?.id, user);
+  const { matchResults, setMatchResults, updateMatchResult } = useSessionSync(
+    sessionPayload?.id,
+    user,
+  );
 
   useEffect(() => {
     if (rawSession) {
@@ -65,10 +66,7 @@ export default function App() {
     }
   }, [rawSession]);
 
-  const players = useMemo(
-    () => normalizePlayers(playerText),
-    [playerText],
-  );
+  const players = useMemo(() => normalizePlayers(playerText), [playerText]);
 
   const sessionUrl = useMemo(() => {
     if (!sessionPayload) return '';
@@ -123,10 +121,10 @@ export default function App() {
 
     if (user) {
       try {
-        await setDoc(
-          doc(db, 'users', user.uid, 'sessions', payload.id),
-          { ...payload, matchResults: {} },
-        );
+        await setDoc(doc(db, 'users', user.uid, 'sessions', payload.id), {
+          ...payload,
+          matchResults: {},
+        });
         await setDoc(doc(db, 'sessions', payload.id), {
           ...payload,
           ownerId: user.uid,

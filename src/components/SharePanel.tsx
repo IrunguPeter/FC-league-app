@@ -20,50 +20,38 @@ export function SharePanel({ sessionUrl }: Props) {
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+    <div className="share-panel">
       <h3
         style={{
-          marginBottom: '1.5rem',
+          marginBottom: '0.5rem',
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
           justifyContent: 'center',
         }}
       >
-        <Share2 size={20} color="var(--accent-blue)" /> Share
+        <Share2 size={18} color="var(--accent-blue)" /> Share Session
       </h3>
-      <div
-        style={{
-          background: 'white',
-          padding: '1rem',
-          borderRadius: '1rem',
-          display: 'inline-block',
-          marginBottom: '1.5rem',
-        }}
+      <p
+        className="meta-text"
+        style={{ marginBottom: '1rem', fontSize: '0.85rem' }}
       >
-        <QRCode value={sessionUrl} size={160} />
+        Scan or share the link below
+      </p>
+      <div className="qr-container">
+        <QRCode value={sessionUrl} size={150} level="M" />
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        <input readOnly value={sessionUrl} style={{ fontSize: '0.8rem' }} />
+      <div className="share-url-row">
+        <input readOnly value={sessionUrl} style={{ fontSize: '0.75rem' }} />
         <button
           className="btn btn-primary"
           onClick={copyToClipboard}
-          style={{ padding: '0 1rem' }}
+          style={{ padding: '0 0.9rem', flexShrink: 0 }}
         >
-          {copied ? <Check size={18} /> : <Copy size={18} />}
+          {copied ? <Check size={16} /> : <Copy size={16} />}
         </button>
       </div>
-      {copied && (
-        <p
-          style={{
-            marginTop: '0.5rem',
-            color: 'var(--accent-emerald)',
-            fontSize: '0.9rem',
-          }}
-        >
-          Link copied to clipboard!
-        </p>
-      )}
+      {copied && <p className="copy-success">Copied to clipboard!</p>}
     </div>
   );
 }

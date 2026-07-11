@@ -12,185 +12,88 @@ export function ProfileCard({ user, careerStats }: Props) {
   const winRate = total > 0 ? Math.round((careerStats.wins / total) * 100) : 0;
 
   return (
-    <div
-      className="glass-panel"
-      style={{
-        padding: '2.5rem',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        border: '1px solid var(--border-subtle)',
-      }}
-    >
-      <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+    <div className="profile-card">
+      <div className="profile-avatar-wrapper">
         <img
           src={
             user.photoURL ||
             `https://ui-avatars.com/api/?name=${user.displayName}`
           }
           alt="Profile"
-          style={{
-            width: '100px',
-            height: '100px',
-            borderRadius: '2.5rem',
-            boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
-            border: '4px solid white',
-          }}
+          className="profile-avatar"
         />
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '-5px',
-            right: '-5px',
-            width: '32px',
-            height: '32px',
-            background: 'var(--accent-emerald)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '3px solid white',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-          }}
-        >
-          <CheckCircle2 size={16} color="white" />
+        <div className="profile-avatar-badge">
+          <CheckCircle2 size={14} color="white" />
         </div>
       </div>
-      <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.75rem' }}>
-        {user.displayName}
-      </h2>
-      <p className="meta-text" style={{ marginBottom: '2rem' }}>
-        {user.email}
-      </p>
+      <h2 className="profile-name">{user.displayName}</h2>
+      <p className="meta-text profile-email">{user.email}</p>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '0.75rem',
-          width: '100%',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div
-          style={{
-            background: 'rgba(16, 185, 129, 0.05)',
-            padding: '1rem',
-            borderRadius: '1rem',
-            border: '1px solid rgba(16, 185, 129, 0.1)',
-          }}
-        >
+      <div className="stat-cards">
+        <div className="stat-card emerald">
           <p
-            style={{
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              color: 'var(--accent-emerald)',
-              marginBottom: '0.25rem',
-            }}
+            className="stat-card-label"
+            style={{ color: 'var(--accent-emerald)' }}
           >
             Wins
           </p>
-          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>
-            {careerStats.wins}
-          </p>
+          <p className="stat-card-value">{careerStats.wins}</p>
         </div>
-        <div
-          style={{
-            background: 'rgba(59, 130, 246, 0.05)',
-            padding: '1rem',
-            borderRadius: '1rem',
-            border: '1px solid rgba(59, 130, 246, 0.1)',
-          }}
-        >
+        <div className="stat-card blue">
           <p
-            style={{
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              color: 'var(--accent-blue)',
-              marginBottom: '0.25rem',
-            }}
+            className="stat-card-label"
+            style={{ color: 'var(--accent-blue)' }}
           >
             Draws
           </p>
-          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>
-            {careerStats.draws}
-          </p>
+          <p className="stat-card-value">{careerStats.draws}</p>
         </div>
-        <div
-          style={{
-            background: 'rgba(239, 68, 68, 0.05)',
-            padding: '1rem',
-            borderRadius: '1rem',
-            border: '1px solid rgba(239, 68, 68, 0.1)',
-          }}
-        >
-          <p
-            style={{
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              color: '#ef4444',
-              marginBottom: '0.25rem',
-            }}
-          >
+        <div className="stat-card red">
+          <p className="stat-card-label" style={{ color: 'var(--accent-red)' }}>
             Losses
           </p>
-          <p style={{ fontSize: '1.25rem', fontWeight: 900 }}>
-            {careerStats.losses}
-          </p>
+          <p className="stat-card-value">{careerStats.losses}</p>
         </div>
       </div>
 
-      <div
-        style={{
-          width: '100%',
-          padding: '1.25rem',
-          background: 'var(--bg-secondary)',
-          borderRadius: '1.5rem',
-          textAlign: 'left',
-          border: '1px solid var(--border-subtle)',
-        }}
-      >
+      <div className="form-detail-card">
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '1rem',
+            marginBottom: '0.75rem',
           }}
         >
           <span
             style={{
-              fontSize: '0.85rem',
+              fontSize: '0.8rem',
               fontWeight: 700,
               color: 'var(--text-secondary)',
             }}
           >
             Recent Form
           </span>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', gap: '0.2rem' }}>
             {careerStats.streak.length > 0
               ? careerStats.streak.map((r, i) => (
                   <div
                     key={i}
                     style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '6px',
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '5px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 900,
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
                       background:
                         r === 'W'
                           ? 'var(--accent-emerald)'
                           : r === 'D'
                             ? 'var(--accent-blue)'
-                            : '#ef4444',
+                            : 'var(--accent-red)',
                       color: 'white',
                     }}
                   >
@@ -201,7 +104,7 @@ export function ProfileCard({ user, careerStats }: Props) {
           </div>
         </div>
         {careerStats.streak.length === 0 && (
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             No matches played
           </span>
         )}
@@ -215,7 +118,7 @@ export function ProfileCard({ user, careerStats }: Props) {
         >
           <span
             style={{
-              fontSize: '0.85rem',
+              fontSize: '0.8rem',
               fontWeight: 700,
               color: 'var(--text-secondary)',
             }}
@@ -224,8 +127,8 @@ export function ProfileCard({ user, careerStats }: Props) {
           </span>
           <span
             style={{
-              fontSize: '1.1rem',
-              fontWeight: 900,
+              fontSize: '1rem',
+              fontWeight: 800,
               color: 'var(--text-primary)',
             }}
           >

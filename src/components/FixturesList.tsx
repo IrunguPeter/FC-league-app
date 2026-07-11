@@ -6,26 +6,33 @@ type Props = {
   rounds: Round[];
   format: Format;
   matchResults: Record<string, MatchResult>;
-  onUpdate: (key: string, field: 'scoreA' | 'scoreB', value: number | '') => void;
+  onUpdate: (
+    key: string,
+    field: 'scoreA' | 'scoreB',
+    value: number | '',
+  ) => void;
 };
 
-export function FixturesList({ rounds, format, matchResults, onUpdate }: Props) {
+export function FixturesList({
+  rounds,
+  format,
+  matchResults,
+  onUpdate,
+}: Props) {
   return (
     <>
-      <h3 style={{ marginBottom: '1.5rem' }}>Fixtures</h3>
+      <h3 className="fixtures-header">Fixtures</h3>
       <div className="grid-auto">
         {rounds.map((round, rIdx) => (
           <motion.div
             key={round.round}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: rIdx * 0.1 }}
+            transition={{ delay: rIdx * 0.08, duration: 0.3 }}
           >
-            <h4
-              style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}
-            >
-              {round.round}
-            </h4>
+            <div className="round-header">
+              <h4>{round.round}</h4>
+            </div>
             {round.matches.map(([h, a]) => {
               const key = `${format === 'league' ? '' : 'champions-league'}|${h}|${a}`;
               const res = matchResults[key];

@@ -32,14 +32,21 @@ export function useSessions(user: User | null | undefined) {
             const parsed = firestoreSessionSchema.safeParse(data);
             return {
               id: doc.id,
-              title: parsed.success ? parsed.data.title : data.title || 'Untitled Session',
-              format: parsed.success ? parsed.data.format : data.format || 'league',
-              players: parsed.success ? parsed.data.players : data.players || [],
+              title: parsed.success
+                ? parsed.data.title
+                : data.title || 'Untitled Session',
+              format: parsed.success
+                ? parsed.data.format
+                : data.format || 'league',
+              players: parsed.success
+                ? parsed.data.players
+                : data.players || [],
               createdAt: parsed.success
                 ? parsed.data.createdAt
                 : data.createdAt || new Date().toISOString(),
               matchResults: parsed.success
-                ? (parsed.data.matchResults as Record<string, MatchResult>) || {}
+                ? (parsed.data.matchResults as Record<string, MatchResult>) ||
+                  {}
                 : data.matchResults || {},
             } as SessionPayload & { matchResults: Record<string, MatchResult> };
           })
@@ -56,7 +63,10 @@ export function useSessions(user: User | null | undefined) {
     return () => unsub();
   }, [user]);
 
-  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+  const handleDeleteSession = async (
+    e: React.MouseEvent,
+    sessionId: string,
+  ) => {
     e.stopPropagation();
     if (!user) return;
 
