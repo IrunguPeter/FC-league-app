@@ -16,6 +16,7 @@ import { staggerContainer, fadeInUp } from '../utils/animation';
 import { ProfileCard } from '../components/ProfileCard';
 import { RecentSessions } from '../components/RecentSessions';
 
+
 type Props = {
   user: User | null | undefined;
   onLogin: () => void;

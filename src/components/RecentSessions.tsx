@@ -18,7 +18,7 @@ export function RecentSessions({ sessions, onSelect, onDelete }: Props) {
           gap: '0.65rem',
         }}
       >
-        <Zap size={18} color="var(--accent-blue)" /> Recent Activity
+        <Zap size={18} color="var(--accent-gold)" /> Recent Activity
       </h3>
       {sessions.length > 0 ? (
         <div className="recent-sessions-container">
@@ -41,7 +41,7 @@ export function RecentSessions({ sessions, onSelect, onDelete }: Props) {
                   borderRadius: '0.85rem',
                   background:
                     s.format === 'league'
-                      ? 'var(--accent-blue-light)'
+                      ? 'var(--accent-gold-light)'
                       : 'var(--accent-purple-light)',
                   display: 'flex',
                   alignItems: 'center',
@@ -50,7 +50,7 @@ export function RecentSessions({ sessions, onSelect, onDelete }: Props) {
                 }}
               >
                 {s.format === 'league' ? (
-                  <LayoutDashboard size={18} color="var(--accent-blue)" />
+                  <LayoutDashboard size={18} color="var(--accent-gold)" />
                 ) : (
                   <Trophy size={18} color="var(--accent-purple)" />
                 )}

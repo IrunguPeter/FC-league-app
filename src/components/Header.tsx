@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { LogOut, LogIn, Gamepad2, Sun, Moon } from 'lucide-react';
+import { LogOut, LogIn, Trophy, Sun, Moon } from 'lucide-react';
 import type { User } from 'firebase/auth';
 
 type Props = {
@@ -26,7 +26,7 @@ export function Header({
       className="header"
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
     >
       <div
         className="header-brand"
@@ -75,7 +75,7 @@ export function Header({
             title="Login with Google"
           >
             <LogIn size={18} />{' '}
-            <span style={{ fontSize: '0.85rem' }}>Sign In</span>
+            <span style={{ fontSize: '0.8rem' }}>Sign In</span>
           </button>
         )}
         <button
@@ -83,7 +83,7 @@ export function Header({
           onClick={onHome}
           title="Home"
         >
-          <Gamepad2 size={18} />
+          <Trophy size={18} />
         </button>
       </div>
     </motion.header>

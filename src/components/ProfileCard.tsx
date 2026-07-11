@@ -42,7 +42,7 @@ export function ProfileCard({ user, careerStats }: Props) {
         <div className="stat-card blue">
           <p
             className="stat-card-label"
-            style={{ color: 'var(--accent-blue)' }}
+            style={{ color: 'var(--accent-gold)' }}
           >
             Draws
           </p>

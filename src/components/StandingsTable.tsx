@@ -75,7 +75,7 @@ export function StandingsTable({ standings, format }: Props) {
                     {entry.goalsFor - entry.goalsAgainst > 0 && '+'}
                     {entry.goalsFor - entry.goalsAgainst}
                   </td>
-                  <td style={{ color: 'var(--accent-blue)', fontWeight: 800 }}>
+                  <td style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>
                     {entry.points}
                   </td>
                 </motion.tr>

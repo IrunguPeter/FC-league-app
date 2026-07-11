@@ -30,7 +30,7 @@ export function SharePanel({ sessionUrl }: Props) {
           justifyContent: 'center',
         }}
       >
-        <Share2 size={18} color="var(--accent-blue)" /> Share Session
+        <Share2 size={18} color="var(--accent-gold)" /> Share Session
       </h3>
       <p
         className="meta-text"

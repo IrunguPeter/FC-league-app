@@ -53,7 +53,7 @@ export function SessionDashboard({
       <div className="dashboard-header">
         <div>
           <div className="dashboard-title-row">
-            <LayoutDashboard size={22} color="var(--accent-blue)" />
+            <LayoutDashboard size={22} color="var(--accent-gold)" />
             <h2 className="session-title">{sessionPayload.title}</h2>
           </div>
           <p className="meta-text session-meta">
