@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Share2, Copy, Check } from 'lucide-react';
+import { Share2, Copy, Check, ExternalLink } from 'lucide-react';
 import QRCode from 'qrcode.react';
 
 type Props = {
@@ -11,47 +11,51 @@ export function SharePanel({ sessionUrl }: Props) {
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(sessionUrl);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(sessionUrl);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = sessionUrl;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.focus();
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
       setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
+      window.setTimeout(() => setCopied(false), 3000);
     } catch {
       setCopied(false);
     }
   };
 
+  const shareSession = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: 'Join my FC League session', url: sessionUrl });
+    } else {
+      await copyToClipboard();
+    }
+  };
+
   return (
     <div className="share-panel">
-      <h3
-        style={{
-          marginBottom: '0.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          justifyContent: 'center',
-        }}
-      >
-        <Share2 size={18} color="var(--accent-gold)" /> Share Session
-      </h3>
-      <p
-        className="meta-text"
-        style={{ marginBottom: '1rem', fontSize: '0.85rem' }}
-      >
-        Scan or share the link below
-      </p>
-      <div className="qr-container">
-        <QRCode value={sessionUrl} size={150} level="M" />
+      <h3 className="share-title"><Share2 size={18} color="var(--accent-gold)" /> Share session</h3>
+      <p className="meta-text share-subtitle">Scan this code or send the link to your squad.</p>
+      <div className="qr-container" aria-label="QR code for this session">
+        <QRCode value={sessionUrl} size={176} level="H" includeMargin />
       </div>
       <div className="share-url-row">
-        <input readOnly value={sessionUrl} style={{ fontSize: '0.75rem' }} />
-        <button
-          className="btn btn-primary"
-          onClick={copyToClipboard}
-          style={{ padding: '0 0.9rem', flexShrink: 0 }}
-        >
+        <input readOnly value={sessionUrl} aria-label="Session link" onFocus={(event) => event.currentTarget.select()} />
+        <button className="btn btn-primary" onClick={copyToClipboard} aria-label="Copy session link">
           {copied ? <Check size={16} /> : <Copy size={16} />}
         </button>
       </div>
-      {copied && <p className="copy-success">Copied to clipboard!</p>}
+      <div className="share-actions">
+        <button className="btn btn-ghost" onClick={shareSession}><ExternalLink size={15} /> Share link</button>
+        {copied && <span className="copy-success"><Check size={14} /> Copied</span>}
+      </div>
     </div>
   );
 }

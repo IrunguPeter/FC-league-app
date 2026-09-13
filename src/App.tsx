@@ -33,7 +33,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('fc-dark-mode');
     if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return false;
   });
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
@@ -71,7 +71,7 @@ export default function App() {
   const sessionUrl = useMemo(() => {
     if (!sessionPayload) return '';
     const encoded = encodePayload(sessionPayload);
-    return `${window.location.origin}${window.location.pathname}?session=${encoded}`;
+    return `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(encoded)}`;
   }, [sessionPayload]);
 
   const standings = useMemo(() => {
