@@ -25,7 +25,7 @@ import {
   generateLeagueRounds,
   generateChampionsStructure,
 } from './utils/standings';
-import type { Format, SessionPayload, MatchResult } from './types';
+import type { Format, SessionPayload, MatchResult, PaidLeague } from './types';
 
 export default function App() {
   const [user, loading] = useAuthState(auth);
@@ -45,6 +45,8 @@ export default function App() {
   const [title, setTitle] = useState('FC League Session');
   const [format, setFormat] = useState<Format>('league');
   const [playerText, setPlayerText] = useState('Alice\nBob\nCharlie\nDiana');
+  const [paidEnabled, setPaidEnabled] = useState(false);
+  const [entryFee, setEntryFee] = useState(100);
   const [sessionPayload, setSessionPayload] = useState<SessionPayload | null>(
     null,
   );
@@ -117,6 +119,17 @@ export default function App() {
       format,
       players,
       createdAt: new Date().toISOString(),
+      paid: paidEnabled
+        ? ({
+            enabled: true,
+            entryFee,
+            currency: 'KES',
+            platformFeePercent: 25,
+            playerPaysProcessingFees: true,
+            prizePool: Math.round(entryFee * players.length * 0.75),
+            payoutStatus: 'not-ready',
+          } satisfies PaidLeague)
+        : undefined,
     };
 
     if (user) {
@@ -192,6 +205,10 @@ export default function App() {
                 playerText={playerText}
                 onPlayerTextChange={setPlayerText}
                 players={players}
+                paidEnabled={paidEnabled}
+                onPaidEnabledChange={setPaidEnabled}
+                entryFee={entryFee}
+                onEntryFeeChange={setEntryFee}
                 onHost={handleHost}
                 joinName={joinName}
                 onJoinNameChange={setJoinName}

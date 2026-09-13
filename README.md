@@ -29,3 +29,11 @@ As you play your matches, enter the scores directly into the fixtures list.
 
 ---
 *Happy Gaming! May the best player win.*
+
+## Paid leagues
+
+Paid leagues use IntaSend checkout for M-Pesa and card entry payments. The current platform policy keeps **25% of collected entry fees** as the platform fee, while **IntaSend processing fees are charged to the player**. The remaining 75% becomes the displayed prize pool.
+
+Payment status is confirmed through the IntaSend webhook rather than a browser redirect. After all matches are complete, the host enters the winner’s Kenyan M-Pesa number and clicks **Release funds**. The payout endpoint verifies the host, checks that the amount matches the stored prize pool, and prevents duplicate release attempts before initiating an IntaSend M-Pesa B2C payout.
+
+To enable the feature in Vercel, add the variables listed in `.env.example`. Keep `INTASEND_SECRET_KEY` and the Firebase Admin private key server-side. Start with `INTASEND_TEST_MODE=true`, configure the IntaSend webhook URL as `/api/webhooks/intasend`, and only switch to live mode after checkout and payout testing are complete.

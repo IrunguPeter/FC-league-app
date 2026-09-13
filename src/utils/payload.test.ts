@@ -26,6 +26,25 @@ describe('encodePayload / decodePayload', () => {
     expect(decodePayload('not-base64')).toBeNull();
     expect(decodePayload('')).toBeNull();
   });
+
+  it('keeps paid league settings in the share payload without unsafe URL characters', () => {
+    const paidPayload = {
+      ...payload,
+      paid: {
+        enabled: true,
+        entryFee: 100,
+        currency: 'KES' as const,
+        platformFeePercent: 25 as const,
+        playerPaysProcessingFees: true,
+        prizePool: 150,
+        payoutStatus: 'not-ready' as const,
+      },
+    };
+    const encoded = encodePayload(paidPayload);
+    expect(encoded).not.toMatch(/[+/=]/);
+    expect(decodePayload(encoded)).toEqual(paidPayload);
+    expect(Math.round(100 * 2 * 0.75)).toBe(150);
+  });
 });
 
 describe('normalizePlayers', () => {

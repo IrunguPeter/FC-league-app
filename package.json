@@ -16,6 +16,7 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "firebase": "^12.14.0",
+    "firebase-admin": "^14.4.0",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.371.0",
     "qrcode.react": "^3.1.0",

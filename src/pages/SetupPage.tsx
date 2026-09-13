@@ -16,6 +16,10 @@ type Props = {
   playerText: string;
   onPlayerTextChange: (v: string) => void;
   players: string[];
+  paidEnabled: boolean;
+  onPaidEnabledChange: (v: boolean) => void;
+  entryFee: number;
+  onEntryFeeChange: (v: number) => void;
   onHost: () => void;
   joinName: string;
   onJoinNameChange: (v: string) => void;
@@ -27,7 +31,8 @@ type Props = {
 export function SetupPage({
   mode, onBack, title, onTitleChange, format, onFormatChange, playerText,
   onPlayerTextChange, players, onHost, joinName, onJoinNameChange,
-  joinMessage, onJoinMessageChange, onSessionLoaded,
+  joinMessage, onJoinMessageChange, onSessionLoaded, paidEnabled,
+  onPaidEnabledChange, entryFee, onEntryFeeChange,
 }: Props) {
   const [isJoining, setIsJoining] = useState(false);
 
@@ -74,6 +79,10 @@ export function SetupPage({
               <button type="button" className={`format-option ${format === 'champions' ? 'selected' : ''}`} onClick={() => onFormatChange('champions')}><Zap size={18} /><span><b>Champions League</b><small>Swiss-style competitive rounds</small></span></button>
             </div></div>
             <div className="form-group"><div className="label-row"><label>Players</label><span>{players.length} added</span></div><textarea rows={6} value={playerText} onChange={(e) => onPlayerTextChange(e.target.value)} placeholder={'Marcus\nJay\nAisha\nSam'} /></div>
+            <div className={`paid-option ${paidEnabled ? 'selected' : ''}`}>
+              <label className="paid-toggle"><input type="checkbox" checked={paidEnabled} onChange={(e) => onPaidEnabledChange(e.target.checked)} /><span className="toggle-track" /><span><b>Make this a paid league</b><small>Players pay before they enter. You release the prize to the winner after the final.</small></span></label>
+              {paidEnabled && <div className="paid-details"><label>Entry fee per player</label><div className="fee-input"><span>KES</span><input type="number" min="1" step="50" value={entryFee} onChange={(e) => onEntryFeeChange(Math.max(1, Number(e.target.value)))} /></div><p>Prize pool preview: <strong>KES {Math.round(entryFee * players.length * 0.75).toLocaleString()}</strong>. FC League keeps 25%; IntaSend processing fees are added at checkout.</p></div>}
+            </div>
             <button className="btn btn-primary btn-large setup-submit" onClick={onHost} disabled={players.length < 2}><Plus size={19} /> Create tournament</button>
             {players.length < 2 && <p className="form-hint">Add at least two players to start.</p>}
           </div>
